@@ -16,69 +16,16 @@ const tools = [DatabaseTool, SvgSymbolTool]
 // Keep this branch on its own storage namespace so older saved data doesn't
 // crash the app during startup migration.
 const persistenceKey = 'sketch-board-document-v3'
-const licenseKey = import.meta.env.VITE_TLDRAW_LICENSE_KEY?.trim()
 const components = {
 	StylePanel: CustomStylePanel,
 	Toolbar: CustomToolbar,
 }
 
-function isProductionLicenseEnvironment() {
-	if (typeof window === 'undefined') return false
-	if (!import.meta.env.PROD) return false
-
-	const hostname = window.location.hostname
-	const isLocalHost =
-		hostname === 'localhost' ||
-		hostname === '127.0.0.1' ||
-		hostname === '0.0.0.0' ||
-		hostname.endsWith('.local')
-
-	return window.location.protocol === 'https:' && !isLocalHost
-}
-
-function MissingLicenseScreen() {
-	return (
-		<div className="license-screen">
-			<div className="license-screen__card">
-				<h1 className="license-screen__title">Missing tldraw license key</h1>
-				<p className="license-screen__body">
-					This deployment is running on a production host, and the tldraw SDK requires a valid
-					license key in production.
-				</p>
-				<p className="license-screen__body">
-					Set <code>VITE_TLDRAW_LICENSE_KEY</code> in Vercel, then redeploy the app.
-				</p>
-				<div className="license-screen__links">
-					<a
-						href="https://tldraw.dev/sdk-features/license-key"
-						target="_blank"
-						rel="noreferrer"
-					>
-						tldraw license key docs
-					</a>
-					<a
-						href="https://tldraw.dev/community/license"
-						target="_blank"
-						rel="noreferrer"
-					>
-						tldraw license overview
-					</a>
-				</div>
-			</div>
-		</div>
-	)
-}
-
 function App() {
-	if (isProductionLicenseEnvironment() && !licenseKey) {
-		return <MissingLicenseScreen />
-	}
-
 	return (
 		<div className="app-shell">
 			<CustomShapeLibraryProvider>
 				<Tldraw
-					licenseKey={licenseKey}
 					shapeUtils={shapeUtils}
 					tools={tools}
 					persistenceKey={persistenceKey}
