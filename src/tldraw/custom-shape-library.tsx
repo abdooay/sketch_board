@@ -10,6 +10,7 @@ import {
 	type ReactNode,
 } from 'react'
 import {
+	getCustomShapeRegistryEntry,
 	getDefaultCustomShapeLibraryItems,
 	normalizeImportedCustomShapeDescriptor,
 	normalizeStoredCustomShapeLibraryItems,
@@ -18,6 +19,12 @@ import {
 	type CustomShapeType,
 } from './custom-shape-registry'
 import { setRuntimeCustomShapeLibraryState } from './custom-shape-library-state'
+import {
+	createLibraryItemIdFromFilename,
+	createLibraryItemLabelFromFilename,
+	isSvgFile,
+	sanitizeSvgMarkup,
+} from './svg-import'
 
 const CUSTOM_SHAPE_LIBRARY_STORAGE_KEY = 'sketch-board-custom-shape-library'
 const CUSTOM_SHAPE_LIBRARY_ACTIVE_ITEM_STORAGE_KEY = 'sketch-board-custom-shape-library-active-item'
@@ -117,6 +124,36 @@ export function CustomShapeLibraryProvider({ children }: { children: ReactNode }
 			const errors: string[] = []
 
 			for (const file of files) {
+				if (isSvgFile(file)) {
+					try {
+						const svgSource = sanitizeSvgMarkup(await file.text())
+						if (!svgSource) {
+							errors.push(`Could not sanitize ${file.name}`)
+							continue
+						}
+
+						const svgEntry = getCustomShapeRegistryEntry('svg-symbol')
+						parsedItems.push({
+							id: createLibraryItemIdFromFilename(file.name),
+							type: 'svg-symbol',
+							label: createLibraryItemLabelFromFilename(file.name),
+							defaultProps: svgEntry.normalizeDefaults({
+								w: svgSource.width,
+								h: svgSource.height,
+							}),
+							source: {
+								kind: 'svg',
+								viewBox: svgSource.viewBox,
+								markup: svgSource.markup,
+							},
+							version: 1,
+						})
+					} catch {
+						errors.push(`Could not parse ${file.name}`)
+					}
+					continue
+				}
+
 				try {
 					const raw = JSON.parse(await file.text()) as
 						| CustomShapeImportDescriptor

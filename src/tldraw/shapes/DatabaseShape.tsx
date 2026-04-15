@@ -13,7 +13,7 @@ import {
 	createShapePropsMigrationIds,
 	createShapePropsMigrationSequence,
 } from '@tldraw/tlschema'
-import { getRuntimeActiveCustomShapeLibraryItem } from '../custom-shape-library-state'
+import { getRuntimeActiveCustomShapeLibraryItemForType } from '../custom-shape-library-state'
 import { DatabaseShapeView } from './DatabaseShapeView'
 
 export const DATABASE_SHAPE_TYPE = 'database'
@@ -75,7 +75,7 @@ export class DatabaseShapeUtil extends BaseBoxShapeUtil<DatabaseShape> {
 	}
 
 	override getDefaultProps(): DatabaseShape['props'] {
-		const activeLibraryItem = getRuntimeActiveCustomShapeLibraryItem()
+		const activeLibraryItem = getRuntimeActiveCustomShapeLibraryItemForType(DATABASE_SHAPE_TYPE)
 
 		return {
 			w: activeLibraryItem?.defaultProps.w ?? 240,

@@ -4,12 +4,14 @@ import './index.css'
 import { CustomShapeLibraryProvider } from './tldraw/custom-shape-library'
 import { uiOverrides } from './tldraw/overrides'
 import { DatabaseShapeUtil } from './tldraw/shapes/DatabaseShape'
+import { SvgSymbolShapeUtil } from './tldraw/shapes/SvgSymbolShape'
 import { CustomStylePanel } from './tldraw/style-panel'
 import { CustomToolbar } from './tldraw/toolbar'
 import { DatabaseTool } from './tldraw/tools/DatabaseTool'
+import { SvgSymbolTool } from './tldraw/tools/SvgSymbolTool'
 
-const shapeUtils = [DatabaseShapeUtil]
-const tools = [DatabaseTool]
+const shapeUtils = [DatabaseShapeUtil, SvgSymbolShapeUtil]
+const tools = [DatabaseTool, SvgSymbolTool]
 const persistenceKey = 'sketch-board-document'
 const components = {
 	StylePanel: CustomStylePanel,

@@ -65,9 +65,9 @@ body {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 20px;
-	height: 20px;
-	flex: 0 0 20px;
+	width: 28px;
+	height: 28px;
+	flex: 0 0 28px;
 }
 
 .custom-shape-library-item__label {
@@ -93,4 +93,24 @@ body {
 
 .custom-shape-library-action:hover {
 	background: rgba(255, 255, 255, 0.08);
+}
+
+.custom-shape-preview {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	height: 100%;
+}
+
+.custom-shape-preview--database {
+	width: 100%;
+	height: 100%;
+}
+
+.custom-shape-preview__svg {
+	width: 100%;
+	height: 100%;
+	display: block;
+	overflow: visible;
 }

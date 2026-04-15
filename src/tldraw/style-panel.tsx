@@ -35,27 +35,44 @@ import {
 	useValue,
 } from 'tldraw'
 import { useCustomShapeLibrary } from './custom-shape-library'
-import { getCustomShapeRegistryEntry } from './custom-shape-registry'
+import { CustomShapeLibraryPreview } from './custom-shape-preview'
+import {
+	getCustomShapeRegistryEntry,
+	type CustomShapeLibraryItem,
+} from './custom-shape-registry'
 import { geoShapeItems, type GeoShapeMenuValue } from './shape-items'
 import { DATABASE_SHAPE_TYPE, type DatabaseShape } from './shapes/DatabaseShape'
+import { SVG_SYMBOL_SHAPE_TYPE, type SvgSymbolShape } from './shapes/SvgSymbolShape'
 
 type SharedMenuValue<T extends string> = { type: 'shared'; value: T } | { type: 'mixed' }
 type GeoShapeReplacement = TLShapePartial<TLGeoShape>
-type DatabaseShapeReplacement = TLShapePartial<DatabaseShape>
+type CustomShapeReplacement = TLShapePartial<DatabaseShape | SvgSymbolShape>
+type CustomCanvasShape = DatabaseShape | SvgSymbolShape
+
+const DEFAULT_GEO_COLOR = 'blue'
+const DEFAULT_GEO_FILL = 'none'
+const DEFAULT_GEO_SIZE = 'm'
 
 function isDatabaseShape(shape: TLShape): shape is DatabaseShape {
 	return shape.type === DATABASE_SHAPE_TYPE
+}
+
+function isSvgSymbolShape(shape: TLShape): shape is SvgSymbolShape {
+	return shape.type === SVG_SYMBOL_SHAPE_TYPE
+}
+
+function isCustomCanvasShape(shape: TLShape): shape is CustomCanvasShape {
+	return isDatabaseShape(shape) || isSvgSymbolShape(shape)
 }
 
 function isGeoShape(shape: TLShape): shape is TLGeoShape {
 	return shape.type === 'geo'
 }
 
-function toGeoShape(
-	shape: DatabaseShape,
-	geo: TLGeoShape['props']['geo']
-): GeoShapeReplacement {
-	const source = shape.props
+function toGeoShape(shape: CustomCanvasShape, geo: TLGeoShape['props']['geo']): GeoShapeReplacement {
+	const color = isDatabaseShape(shape) ? shape.props.color : DEFAULT_GEO_COLOR
+	const fill = isDatabaseShape(shape) ? shape.props.fill : DEFAULT_GEO_FILL
+	const size = isDatabaseShape(shape) ? shape.props.size : DEFAULT_GEO_SIZE
 
 	return {
 		id: createShapeId(),
@@ -69,25 +86,22 @@ function toGeoShape(
 		opacity: shape.opacity,
 		meta: shape.meta,
 		props: {
-			w: source.w,
-			h: source.h,
-			color: source.color,
-			fill: source.fill,
-			size: source.size,
+			w: shape.props.w,
+			h: shape.props.h,
+			color,
+			fill,
+			size,
 			geo,
 		},
 	}
 }
 
-function toDatabaseShape(
-	shape: TLGeoShape,
-	libraryItemId: string
-): DatabaseShapeReplacement {
-	const source = shape.props
-
-	return {
+function createCustomShapeFromLibraryItem(
+	shape: TLGeoShape | CustomCanvasShape,
+	item: CustomShapeLibraryItem
+): CustomShapeReplacement {
+	const base = {
 		id: createShapeId(),
-		type: DATABASE_SHAPE_TYPE,
 		x: shape.x,
 		y: shape.y,
 		rotation: shape.rotation,
@@ -96,13 +110,40 @@ function toDatabaseShape(
 		isLocked: shape.isLocked,
 		opacity: shape.opacity,
 		meta: shape.meta,
+	}
+
+	const width = shape.props.w
+	const height = shape.props.h
+
+	if (item.type === DATABASE_SHAPE_TYPE) {
+		const color =
+			isGeoShape(shape) || isDatabaseShape(shape) ? shape.props.color : item.defaultProps.color
+		const fill =
+			isGeoShape(shape) || isDatabaseShape(shape) ? shape.props.fill : item.defaultProps.fill
+		const size =
+			isGeoShape(shape) || isDatabaseShape(shape) ? shape.props.size : item.defaultProps.size
+
+		return {
+			...base,
+			type: DATABASE_SHAPE_TYPE,
+			props: {
+				w: width,
+				h: height,
+				color,
+				fill,
+				size,
+				libraryItemId: item.id,
+			},
+		}
+	}
+
+	return {
+		...base,
+		type: SVG_SYMBOL_SHAPE_TYPE,
 		props: {
-			w: source.w,
-			h: source.h,
-			color: source.color,
-			fill: source.fill,
-			size: source.size,
-			libraryItemId,
+			w: width,
+			h: height,
+			libraryItemId: item.id,
 		},
 	}
 }
@@ -119,7 +160,7 @@ function GeoShapePicker() {
 			if (editor.isIn('select')) {
 				const selected = editor.getSelectedShapes()
 				if (selected.length > 0) {
-					if (selected.some((shape) => !isGeoShape(shape) && !isDatabaseShape(shape))) return null
+					if (selected.some((shape) => !isGeoShape(shape) && !isCustomCanvasShape(shape))) return null
 
 					const geoSelected = selected.filter(isGeoShape)
 					if (geoSelected.length !== selected.length) return { type: 'mixed' }
@@ -134,7 +175,11 @@ function GeoShapePicker() {
 			}
 
 			const currentTool = editor.getCurrentToolId()
-			if (currentTool === 'geo' || currentTool === DATABASE_SHAPE_TYPE) {
+			if (
+				currentTool === 'geo' ||
+				currentTool === DATABASE_SHAPE_TYPE ||
+				currentTool === SVG_SYMBOL_SHAPE_TYPE
+			) {
 				return {
 					type: 'shared',
 					value: editor.getStyleForNextShape(GeoShapeGeoStyle),
@@ -166,11 +211,11 @@ function GeoShapePicker() {
 		editor.run(() => {
 			const selected = editor
 				.getSelectedShapes()
-				.filter((shape) => isGeoShape(shape) || isDatabaseShape(shape))
+				.filter((shape) => isGeoShape(shape) || isCustomCanvasShape(shape))
 
 			if (editor.isIn('select') && selected.length > 0) {
 				const geoSelected = selected.filter(isGeoShape)
-				const databaseSelected = selected.filter(isDatabaseShape)
+				const customSelected = selected.filter(isCustomCanvasShape)
 
 				if (geoSelected.length > 0) {
 					editor.updateShapes(
@@ -182,9 +227,9 @@ function GeoShapePicker() {
 					)
 				}
 
-				const replacements = databaseSelected.map((shape) => toGeoShape(shape, nextValue))
+				const replacements = customSelected.map((shape) => toGeoShape(shape, nextValue))
 				if (replacements.length > 0) {
-					editor.deleteShapes(databaseSelected.map((shape) => shape.id))
+					editor.deleteShapes(customSelected.map((shape) => shape.id))
 					editor.createShapes(replacements)
 				}
 
@@ -263,13 +308,13 @@ function CustomLibraryShapePicker() {
 			if (editor.isIn('select')) {
 				const selected = editor.getSelectedShapes()
 				if (selected.length > 0) {
-					if (selected.some((shape) => !isGeoShape(shape) && !isDatabaseShape(shape))) return null
+					if (selected.some((shape) => !isGeoShape(shape) && !isCustomCanvasShape(shape))) return null
 
-					const databaseSelected = selected.filter(isDatabaseShape)
-					if (databaseSelected.length === selected.length) {
-						const unique = new Set(databaseSelected.map((shape) => shape.props.libraryItemId))
+					const customSelected = selected.filter(isCustomCanvasShape)
+					if (customSelected.length === selected.length) {
+						const unique = new Set(customSelected.map((shape) => shape.props.libraryItemId))
 						if (unique.size === 1) {
-							return { type: 'shared', value: databaseSelected[0].props.libraryItemId }
+							return { type: 'shared', value: customSelected[0].props.libraryItemId }
 						}
 						return { type: 'mixed' }
 					}
@@ -277,13 +322,16 @@ function CustomLibraryShapePicker() {
 					if (activeItemId) {
 						return { type: 'shared', value: activeItemId }
 					}
-
-					return null
 				}
 			}
 
 			const currentTool = editor.getCurrentToolId()
-			if ((currentTool === 'geo' || currentTool === DATABASE_SHAPE_TYPE) && activeItemId) {
+			if (
+				(currentTool === 'geo' ||
+					currentTool === DATABASE_SHAPE_TYPE ||
+					currentTool === SVG_SYMBOL_SHAPE_TYPE) &&
+				activeItemId
+			) {
 				return { type: 'shared', value: activeItemId }
 			}
 
@@ -316,32 +364,32 @@ function CustomLibraryShapePicker() {
 		editor.run(() => {
 			const selected = editor
 				.getSelectedShapes()
-				.filter((shape) => isGeoShape(shape) || isDatabaseShape(shape))
+				.filter((shape) => isGeoShape(shape) || isCustomCanvasShape(shape))
 
 			if (editor.isIn('select') && selected.length > 0) {
 				const geoSelected = selected.filter(isGeoShape)
-				const databaseSelected = selected.filter(isDatabaseShape)
+				const customSelected = selected.filter(isCustomCanvasShape)
+				const sameTypeSelected = customSelected.filter((shape) => shape.type === item.type)
+				const replacingSelected = [...geoSelected, ...customSelected.filter((shape) => shape.type !== item.type)]
 
-				const updates: DatabaseShapeReplacement[] = databaseSelected
-					.filter((shape) => shape.props.libraryItemId !== libraryItemId)
-					.map((shape) => ({
-						id: shape.id,
-						type: DATABASE_SHAPE_TYPE,
-						props: { libraryItemId },
-					}))
-
-				if (updates.length > 0) {
-					editor.updateShapes(updates)
+				if (sameTypeSelected.length > 0) {
+					editor.updateShapes(
+						sameTypeSelected.map((shape) => ({
+							id: shape.id,
+							type: item.type,
+							props: { libraryItemId: item.id },
+						}))
+					)
 				}
 
-				const replacements = geoSelected.map((shape) => toDatabaseShape(shape, libraryItemId))
+				const replacements = replacingSelected.map((shape) => createCustomShapeFromLibraryItem(shape, item))
 				if (replacements.length > 0) {
-					editor.deleteShapes(geoSelected.map((shape) => shape.id))
+					editor.deleteShapes(replacingSelected.map((shape) => shape.id))
 					editor.createShapes(replacements)
 				}
 
 				editor.setSelectedShapes([
-					...databaseSelected.map((shape) => shape.id),
+					...sameTypeSelected.map((shape) => shape.id),
 					...replacements.map((shape) => shape.id),
 				])
 			} else {
@@ -412,7 +460,7 @@ function CustomLibraryShapePicker() {
 									onClick={() => applyValue(item.id)}
 								>
 									<span className="custom-shape-library-item__icon">
-										<TldrawUiButtonIcon icon={getCustomShapeRegistryEntry(item.type).icon} />
+										<CustomShapeLibraryPreview item={item} />
 									</span>
 									<span className="custom-shape-library-item__label">{item.label}</span>
 								</button>
@@ -424,13 +472,13 @@ function CustomLibraryShapePicker() {
 								className="custom-shape-library-action"
 								onClick={handleImportClick}
 							>
-								Import JSON
+								Import SVG / JSON
 							</button>
 						</div>
 						<input
 							ref={fileInputRef}
 							type="file"
-							accept=".json,application/json"
+							accept=".svg,.json,image/svg+xml,application/json"
 							multiple
 							hidden
 							onChange={handleFileChange}

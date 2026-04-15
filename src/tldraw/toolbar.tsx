@@ -28,10 +28,12 @@ import {
 	useValue,
 } from 'tldraw'
 import { useCustomShapeLibrary } from './custom-shape-library'
+import { CustomShapeLibraryPreview } from './custom-shape-preview'
 import { databaseIcon } from './database-icon'
 import { getCustomShapeRegistryEntry } from './custom-shape-registry'
 import { geoShapeItems, type GeoShapeMenuValue } from './shape-items'
 import { DATABASE_SHAPE_TYPE } from './shapes/DatabaseShape'
+import { SVG_SYMBOL_SHAPE_TYPE } from './shapes/SvgSymbolShape'
 
 function ShapesToolbarItem() {
 	const editor = useEditor()
@@ -192,7 +194,10 @@ function CustomShapesToolbarItem() {
 					title={currentItem ? `Custom shapes - ${currentItem.label}` : 'Custom shapes'}
 					data-testid="tools.custom-shapes"
 					data-value="custom-shapes"
-					isActive={editor.getCurrentToolId() === DATABASE_SHAPE_TYPE}
+					isActive={
+						editor.getCurrentToolId() === DATABASE_SHAPE_TYPE ||
+						editor.getCurrentToolId() === SVG_SYMBOL_SHAPE_TYPE
+					}
 				>
 					<TldrawUiButtonIcon icon={currentIcon} />
 				</TldrawUiToolbarButton>
@@ -201,8 +206,6 @@ function CustomShapesToolbarItem() {
 				<div className="custom-shape-library-menu">
 					<div className="custom-shape-library-list" role="list" aria-label="Custom shape library">
 						{items.map((item) => {
-							const icon = getCustomShapeRegistryEntry(item.type).icon
-
 							return (
 								<button
 									key={item.id}
@@ -213,7 +216,7 @@ function CustomShapesToolbarItem() {
 									onClick={() => selectLibraryItem(item.id)}
 								>
 									<span className="custom-shape-library-item__icon">
-										<TldrawUiButtonIcon icon={icon} />
+										<CustomShapeLibraryPreview item={item} />
 									</span>
 									<span className="custom-shape-library-item__label">{item.label}</span>
 								</button>
@@ -222,7 +225,7 @@ function CustomShapesToolbarItem() {
 					</div>
 					<div className="custom-shape-library-actions">
 						<button type="button" className="custom-shape-library-action" onClick={handleImportClick}>
-							Import JSON
+							Import SVG / JSON
 						</button>
 						<button type="button" className="custom-shape-library-action" onClick={handleRename}>
 							Rename
@@ -234,7 +237,7 @@ function CustomShapesToolbarItem() {
 					<input
 						ref={fileInputRef}
 						type="file"
-						accept=".json,application/json"
+						accept=".svg,.json,image/svg+xml,application/json"
 						multiple
 						hidden
 						onChange={handleFileChange}
