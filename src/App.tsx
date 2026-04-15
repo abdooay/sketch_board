@@ -12,7 +12,10 @@ import { SvgSymbolTool } from './tldraw/tools/SvgSymbolTool'
 
 const shapeUtils = [DatabaseShapeUtil, SvgSymbolShapeUtil]
 const tools = [DatabaseTool, SvgSymbolTool]
-const persistenceKey = 'sketch-board-document'
+// tldraw 3.x cannot read the persisted store produced by the 4.x branch.
+// Keep this branch on its own storage namespace so older saved data doesn't
+// crash the app during startup migration.
+const persistenceKey = 'sketch-board-document-v3'
 const licenseKey = import.meta.env.VITE_TLDRAW_LICENSE_KEY?.trim()
 const components = {
 	StylePanel: CustomStylePanel,
