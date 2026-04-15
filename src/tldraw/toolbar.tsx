@@ -254,11 +254,11 @@ export function CustomToolbar() {
 			<EraserToolbarItem />
 			<ArrowToolbarItem />
 			<TextToolbarItem />
-			<NoteToolbarItem />
-			<AssetToolbarItem />
 
 			<ShapesToolbarItem />
 			<CustomShapesToolbarItem />
+			<NoteToolbarItem />
+			<AssetToolbarItem />
 			<LineToolbarItem />
 			<HighlightToolbarItem />
 			<LaserToolbarItem />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 import {
 	DefaultStylePanel,
 	GeoShapeGeoStyle,
@@ -30,6 +30,7 @@ import {
 	type TLUiTranslationKey,
 	useEditor,
 	useStylePanelContext,
+	useToasts,
 	useTranslation,
 	useValue,
 } from 'tldraw'
@@ -249,9 +250,12 @@ function GeoShapePicker() {
 function CustomLibraryShapePicker() {
 	const editor = useEditor()
 	const msg = useTranslation()
+	const { addToast } = useToasts()
 	const { onHistoryMark } = useStylePanelContext()
-	const { items, activeItem, activeItemId, setActiveItem, getItem } = useCustomShapeLibrary()
+	const { items, activeItem, activeItemId, setActiveItem, getItem, importItemsFromFiles } =
+		useCustomShapeLibrary()
 	const [isOpen, setIsOpen] = useState(false)
+	const fileInputRef = useRef<HTMLInputElement | null>(null)
 
 	const value = useValue<SharedMenuValue<string> | null>(
 		'custom library shape picker value',
@@ -348,6 +352,34 @@ function CustomLibraryShapePicker() {
 		setIsOpen(false)
 	}
 
+	const handleImportClick = () => {
+		fileInputRef.current?.click()
+	}
+
+	const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+		const files = Array.from(event.currentTarget.files ?? [])
+		event.currentTarget.value = ''
+		if (files.length === 0) return
+
+		const result = await importItemsFromFiles(files)
+
+		if (result.added > 0 || result.updated > 0) {
+			addToast({
+				severity: 'success',
+				title: 'Custom shape library updated',
+				description: `Added ${result.added}, updated ${result.updated}.`,
+			})
+		}
+
+		if (result.errors.length > 0) {
+			addToast({
+				severity: 'warning',
+				title: 'Some custom shapes were skipped',
+				description: result.errors.join(' '),
+			})
+		}
+	}
+
 	return (
 		<TldrawUiToolbar label="Custom shape">
 			<TldrawUiPopover
@@ -386,6 +418,23 @@ function CustomLibraryShapePicker() {
 								</button>
 							))}
 						</div>
+						<div className="custom-shape-library-actions">
+							<button
+								type="button"
+								className="custom-shape-library-action"
+								onClick={handleImportClick}
+							>
+								Import JSON
+							</button>
+						</div>
+						<input
+							ref={fileInputRef}
+							type="file"
+							accept=".json,application/json"
+							multiple
+							hidden
+							onChange={handleFileChange}
+						/>
 					</div>
 				</TldrawUiPopoverContent>
 			</TldrawUiPopover>
