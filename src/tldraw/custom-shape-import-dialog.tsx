@@ -6,6 +6,7 @@ import {
 	type ClipboardEvent,
 	type DragEvent,
 } from 'react'
+import { createPortal } from 'react-dom'
 import { useToasts } from 'tldraw'
 import { useCustomShapeLibrary } from './custom-shape-library'
 
@@ -135,7 +136,7 @@ export function CustomShapeImportDialog({ open, onClose }: CustomShapeImportDial
 		)
 	}
 
-	return (
+	return createPortal(
 		<div className="custom-shape-import-dialog-backdrop" onClick={onClose}>
 			<div
 				className="custom-shape-import-dialog"
@@ -216,6 +217,7 @@ export function CustomShapeImportDialog({ open, onClose }: CustomShapeImportDial
 					onChange={handleFileInputChange}
 				/>
 			</div>
-		</div>
+		</div>,
+		document.body
 	)
 }
