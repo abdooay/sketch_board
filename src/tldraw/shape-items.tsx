@@ -1,12 +1,10 @@
 import type { TLGeoShape } from 'tldraw'
-import { databaseIcon } from './database-icon'
-import { DATABASE_SHAPE_TYPE } from './shapes/DatabaseShape'
 
-export type ShapeMenuValue = TLGeoShape['props']['geo'] | typeof DATABASE_SHAPE_TYPE
+export type GeoShapeMenuValue = TLGeoShape['props']['geo']
 
-export const shapeItems: readonly {
-	value: ShapeMenuValue
-	icon: string | typeof databaseIcon
+export const geoShapeItems: readonly {
+	value: GeoShapeMenuValue
+	icon: string
 }[] = [
 	{ value: 'rectangle', icon: 'geo-rectangle' },
 	{ value: 'ellipse', icon: 'geo-ellipse' },
@@ -28,5 +26,4 @@ export const shapeItems: readonly {
 	{ value: 'x-box', icon: 'geo-x-box' },
 	{ value: 'check-box', icon: 'geo-check-box' },
 	{ value: 'heart', icon: 'geo-heart' },
-	{ value: DATABASE_SHAPE_TYPE, icon: databaseIcon },
 ] as const

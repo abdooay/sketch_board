@@ -1,6 +1,7 @@
 import { Tldraw } from 'tldraw'
 import 'tldraw/tldraw.css'
 import './index.css'
+import { CustomShapeLibraryProvider } from './tldraw/custom-shape-library'
 import { uiOverrides } from './tldraw/overrides'
 import { DatabaseShapeUtil } from './tldraw/shapes/DatabaseShape'
 import { CustomStylePanel } from './tldraw/style-panel'
@@ -18,6 +19,7 @@ const components = {
 function App() {
 	return (
 		<div className="app-shell">
+			<CustomShapeLibraryProvider>
 				<Tldraw
 					shapeUtils={shapeUtils}
 					tools={tools}
@@ -25,9 +27,10 @@ function App() {
 					overrides={uiOverrides}
 					components={components}
 					onMount={(editor) => {
-					editor.user.updateUserPreferences({ colorScheme: 'dark' })
-				}}
-			/>
+						editor.user.updateUserPreferences({ colorScheme: 'dark' })
+					}}
+				/>
+			</CustomShapeLibraryProvider>
 		</div>
 	)
 }

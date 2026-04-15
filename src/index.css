@@ -20,3 +20,77 @@ body {
 	width: 100%;
 	height: 100%;
 }
+
+.custom-shape-library-menu {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-width: 220px;
+}
+
+.custom-shape-library-menu--panel {
+	min-width: 200px;
+}
+
+.custom-shape-library-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.custom-shape-library-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.04);
+	color: #f4f4f5;
+	padding: 8px 10px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.custom-shape-library-item:hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.custom-shape-library-item[data-active='true'] {
+	border-color: rgba(59, 130, 246, 0.65);
+	background: rgba(59, 130, 246, 0.14);
+}
+
+.custom-shape-library-item__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	flex: 0 0 20px;
+}
+
+.custom-shape-library-item__label {
+	font-size: 13px;
+	line-height: 1.2;
+}
+
+.custom-shape-library-actions {
+	display: flex;
+	gap: 8px;
+}
+
+.custom-shape-library-action {
+	flex: 1 1 0;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.04);
+	color: #f4f4f5;
+	padding: 8px 10px;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.custom-shape-library-action:hover {
+	background: rgba(255, 255, 255, 0.08);
+}

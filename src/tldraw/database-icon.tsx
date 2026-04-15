@@ -11,7 +11,7 @@ export const databaseIcon = (
 		<svg
 			viewBox="0 0 24 24"
 			aria-hidden="true"
-			style={{ width: '100%', height: '100%', display: 'block' }}
+			style={{ width: '72%', height: '72%', display: 'block' }}
 		>
 			<ellipse
 				cx="12"

@@ -9,9 +9,31 @@ import {
 	type TLDefaultFillStyle,
 	type TLDefaultSizeStyle,
 } from 'tldraw'
+import {
+	createShapePropsMigrationIds,
+	createShapePropsMigrationSequence,
+} from '@tldraw/tlschema'
+import { getRuntimeActiveCustomShapeLibraryItem } from '../custom-shape-library-state'
 import { DatabaseShapeView } from './DatabaseShapeView'
 
 export const DATABASE_SHAPE_TYPE = 'database'
+const DEFAULT_DATABASE_LIBRARY_ITEM_ID = 'database-default'
+
+const databaseShapeVersions = createShapePropsMigrationIds(DATABASE_SHAPE_TYPE, {
+	AddLibraryItemId: 1,
+})
+
+const databaseShapeMigrations = createShapePropsMigrationSequence({
+	sequence: [
+		{
+			id: databaseShapeVersions.AddLibraryItemId,
+			up: (props) => {
+				props.libraryItemId = DEFAULT_DATABASE_LIBRARY_ITEM_ID
+			},
+			down: 'retired',
+		},
+	],
+})
 
 export type DatabaseShape = TLBaseShape<
 	typeof DATABASE_SHAPE_TYPE,
@@ -21,6 +43,7 @@ export type DatabaseShape = TLBaseShape<
 		color: TLDefaultColorStyle
 		fill: TLDefaultFillStyle
 		size: TLDefaultSizeStyle
+		libraryItemId: string
 	}
 >
 
@@ -32,6 +55,7 @@ declare module 'tldraw' {
 
 export class DatabaseShapeUtil extends BaseBoxShapeUtil<DatabaseShape> {
 	static override type = DATABASE_SHAPE_TYPE
+	static override migrations = databaseShapeMigrations
 
 	static override props = {
 		w: T.number,
@@ -39,6 +63,7 @@ export class DatabaseShapeUtil extends BaseBoxShapeUtil<DatabaseShape> {
 		color: DefaultColorStyle,
 		fill: DefaultFillStyle,
 		size: DefaultSizeStyle,
+		libraryItemId: T.string,
 	}
 
 	override canEdit() {
@@ -50,12 +75,15 @@ export class DatabaseShapeUtil extends BaseBoxShapeUtil<DatabaseShape> {
 	}
 
 	override getDefaultProps(): DatabaseShape['props'] {
+		const activeLibraryItem = getRuntimeActiveCustomShapeLibraryItem()
+
 		return {
-			w: 240,
-			h: 160,
-			color: 'blue',
-			fill: 'semi',
-			size: 'm',
+			w: activeLibraryItem?.defaultProps.w ?? 240,
+			h: activeLibraryItem?.defaultProps.h ?? 160,
+			color: activeLibraryItem?.defaultProps.color ?? 'blue',
+			fill: activeLibraryItem?.defaultProps.fill ?? 'semi',
+			size: activeLibraryItem?.defaultProps.size ?? 'm',
+			libraryItemId: activeLibraryItem?.id ?? DEFAULT_DATABASE_LIBRARY_ITEM_ID,
 		}
 	}
 
