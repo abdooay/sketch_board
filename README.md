@@ -133,6 +133,15 @@ Open `Import SVG / JSON` from the custom shape controls and use any of these:
 
 This project works as a standard Vite deployment on Vercel.
 
+Important:
+Production deployment is also subject to the `tldraw SDK License`.
+According to the official tldraw docs, production use requires a valid `trial`, `hobby`, or `commercial` license key, and commercial production use requires a `commercial` tldraw license.
+See:
+
+- https://tldraw.dev/sdk-features/license-key
+- https://tldraw.dev/legal/tldraw-license
+- https://tldraw.dev/community/license
+
 Recommended Vercel settings:
 
 - Framework Preset: `Vite`
@@ -175,6 +184,20 @@ That means you can:
 
 You must keep the copyright notice and license text.
 
+This applies to the source code in this repository.
+It does not replace the separate license terms of third-party dependencies.
+
+In particular, this project depends on `tldraw`.
+If you deploy this app in production, your use is also subject to the `tldraw SDK License`.
+For commercial production use, you should expect to need a commercial tldraw license key.
+
 ## License
 
 See [LICENSE](./LICENSE).
+
+## Third-Party Licensing
+
+- This repository's own code: `MIT`
+- `tldraw` SDK: separate tldraw license for production use
+
+See [NOTICE](./NOTICE).

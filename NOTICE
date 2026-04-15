@@ -1,0 +1,13 @@
+Project licensing summary
+
+1. This repository's original source code is licensed under the MIT License.
+2. This repository depends on the tldraw SDK.
+3. The MIT License in this repository does not replace, override, or relicense tldraw.
+4. Production use of the tldraw SDK is subject to tldraw's own licensing terms.
+5. Commercial production use of this project may require a commercial tldraw license key.
+
+Official tldraw references:
+
+- https://tldraw.dev/sdk-features/license-key
+- https://tldraw.dev/legal/tldraw-license
+- https://tldraw.dev/community/license
