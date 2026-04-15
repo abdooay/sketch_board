@@ -1,0 +1,35 @@
+import { Tldraw } from 'tldraw'
+import 'tldraw/tldraw.css'
+import './index.css'
+import { uiOverrides } from './tldraw/overrides'
+import { DatabaseShapeUtil } from './tldraw/shapes/DatabaseShape'
+import { CustomStylePanel } from './tldraw/style-panel'
+import { CustomToolbar } from './tldraw/toolbar'
+import { DatabaseTool } from './tldraw/tools/DatabaseTool'
+
+const shapeUtils = [DatabaseShapeUtil]
+const tools = [DatabaseTool]
+const persistenceKey = 'sketch-board-document'
+const components = {
+	StylePanel: CustomStylePanel,
+	Toolbar: CustomToolbar,
+}
+
+function App() {
+	return (
+		<div className="app-shell">
+				<Tldraw
+					shapeUtils={shapeUtils}
+					tools={tools}
+					persistenceKey={persistenceKey}
+					overrides={uiOverrides}
+					components={components}
+					onMount={(editor) => {
+					editor.user.updateUserPreferences({ colorScheme: 'dark' })
+				}}
+			/>
+		</div>
+	)
+}
+
+export default App
