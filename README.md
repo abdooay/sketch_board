@@ -56,6 +56,7 @@ src/
 
 ```bash
 npm install
+cp .env.example .env.local
 ```
 
 ### Start The Dev Server
@@ -149,13 +150,19 @@ Recommended Vercel settings:
 - Build Command: `npm run build`
 - Output Directory: `dist`
 
+Required environment variable:
+
+- `VITE_TLDRAW_LICENSE_KEY`
+
 #### Dashboard Flow
 
 1. Push this repo to GitHub.
 2. Go to `https://vercel.com/new`.
 3. Import the GitHub repository.
 4. Confirm the Vite settings above.
-5. Deploy.
+5. Open `Settings` -> `Environment Variables`.
+6. Add `VITE_TLDRAW_LICENSE_KEY` with your valid tldraw license key.
+7. Deploy or redeploy.
 
 #### CLI Flow
 
@@ -170,6 +177,18 @@ For a production deployment:
 ```bash
 vercel --prod
 ```
+
+### Why A Blank Screen Can Happen On Vercel
+
+If the app works locally but turns blank on a public Vercel URL a few seconds after loading, the most likely cause is a missing tldraw production license key.
+
+This repo now reads the key from:
+
+```bash
+VITE_TLDRAW_LICENSE_KEY
+```
+
+If that value is missing on a production-style host, the app will show a setup screen instead of trying to boot tldraw without a key.
 
 ## Reuse And Forking
 
