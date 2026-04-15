@@ -1,4 +1,4 @@
-import { onDragFromToolbarToCreateShape, type TLPointerEventInfo, type TLUiOverrides } from 'tldraw'
+import { type TLUiOverrides } from 'tldraw'
 import { databaseIcon } from './database-icon'
 import { svgSymbolIcon } from './svg-symbol-icon'
 import { DATABASE_SHAPE_TYPE } from './shapes/DatabaseShape'
@@ -31,15 +31,6 @@ export const uiOverrides: TLUiOverrides = {
 			onSelect() {
 				editor.setCurrentTool(DATABASE_SHAPE_TYPE)
 			},
-			onDragStart(_source: string, info: TLPointerEventInfo) {
-				onDragFromToolbarToCreateShape(editor, info, {
-					createShape: (id) =>
-						editor.createShape({
-							id,
-							type: DATABASE_SHAPE_TYPE,
-						}),
-				})
-			},
 		}
 
 		tools[SVG_SYMBOL_SHAPE_TYPE] = {
@@ -49,15 +40,6 @@ export const uiOverrides: TLUiOverrides = {
 			kbd: 'w',
 			onSelect() {
 				editor.setCurrentTool(SVG_SYMBOL_SHAPE_TYPE)
-			},
-			onDragStart(_source: string, info: TLPointerEventInfo) {
-				onDragFromToolbarToCreateShape(editor, info, {
-					createShape: (id) =>
-						editor.createShape({
-							id,
-							type: SVG_SYMBOL_SHAPE_TYPE,
-						}),
-				})
 			},
 		}
 

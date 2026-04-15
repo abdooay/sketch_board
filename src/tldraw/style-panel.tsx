@@ -1,19 +1,8 @@
 import { useMemo, useState } from 'react'
 import {
 	DefaultStylePanel,
+	DefaultStylePanelContent,
 	GeoShapeGeoStyle,
-	StylePanelArrowKindPicker,
-	StylePanelArrowheadPicker,
-	StylePanelColorPicker,
-	StylePanelDashPicker,
-	StylePanelFillPicker,
-	StylePanelFontPicker,
-	StylePanelLabelAlignPicker,
-	StylePanelOpacityPicker,
-	StylePanelSection,
-	StylePanelSizePicker,
-	StylePanelSplinePicker,
-	StylePanelTextAlignPicker,
 	TldrawUiButtonIcon,
 	TldrawUiButtonLabel,
 	TldrawUiMenuContextProvider,
@@ -29,7 +18,7 @@ import {
 	type TLUiStylePanelProps,
 	type TLUiTranslationKey,
 	useEditor,
-	useStylePanelContext,
+	useRelevantStyles,
 	useTranslation,
 	useValue,
 } from 'tldraw'
@@ -112,9 +101,6 @@ function createCustomShapeFromLibraryItem(
 		meta: shape.meta,
 	}
 
-	const width = shape.props.w
-	const height = shape.props.h
-
 	if (item.type === DATABASE_SHAPE_TYPE) {
 		const color =
 			isGeoShape(shape) || isDatabaseShape(shape) ? shape.props.color : item.defaultProps.color
@@ -127,8 +113,8 @@ function createCustomShapeFromLibraryItem(
 			...base,
 			type: DATABASE_SHAPE_TYPE,
 			props: {
-				w: width,
-				h: height,
+				w: shape.props.w,
+				h: shape.props.h,
 				color,
 				fill,
 				size,
@@ -141,8 +127,8 @@ function createCustomShapeFromLibraryItem(
 		...base,
 		type: SVG_SYMBOL_SHAPE_TYPE,
 		props: {
-			w: width,
-			h: height,
+			w: shape.props.w,
+			h: shape.props.h,
 			libraryItemId: item.id,
 		},
 	}
@@ -151,7 +137,6 @@ function createCustomShapeFromLibraryItem(
 function GeoShapePicker() {
 	const editor = useEditor()
 	const msg = useTranslation()
-	const { onHistoryMark } = useStylePanelContext()
 	const [isOpen, setIsOpen] = useState(false)
 
 	const value = useValue<SharedMenuValue<GeoShapeMenuValue> | null>(
@@ -206,7 +191,7 @@ function GeoShapePicker() {
 				)}`
 
 	const applyValue = (nextValue: GeoShapeMenuValue) => {
-		onHistoryMark('geo shape picker item')
+		editor.markHistoryStoppingPoint('geo shape picker item')
 
 		editor.run(() => {
 			const selected = editor
@@ -250,12 +235,7 @@ function GeoShapePicker() {
 
 	return (
 		<TldrawUiToolbar label={msg('style-panel.geo')}>
-			<TldrawUiPopover
-				id="style-panel-geo-shape-picker"
-				open={isOpen}
-				onOpenChange={setIsOpen}
-				className="tlui-style-panel__dropdown-picker"
-			>
+			<TldrawUiPopover id="style-panel-geo-shape-picker" open={isOpen} onOpenChange={setIsOpen}>
 				<TldrawUiPopoverTrigger>
 					<TldrawUiToolbarButton type="menu" data-testid="style.geo" data-direction="left" title={title}>
 						<TldrawUiButtonLabel>{msg('style-panel.geo')}</TldrawUiButtonLabel>
@@ -263,29 +243,31 @@ function GeoShapePicker() {
 					</TldrawUiToolbarButton>
 				</TldrawUiPopoverTrigger>
 				<TldrawUiPopoverContent side="left" align="center">
-					<TldrawUiToolbar orientation="grid" label={msg('style-panel.geo')}>
-						<TldrawUiMenuContextProvider type="icons" sourceId="style-panel">
-							{geoShapeItems.map((item) => {
-								const itemTitle = `${msg('style-panel.geo')} - ${msg(
-									`geo-style.${item.value}` as TLUiTranslationKey
-								)}`
-								const isActive = value.type === 'shared' && value.value === item.value
+					<div className="custom-shape-grid-toolbar">
+						<TldrawUiToolbar label={msg('style-panel.geo')}>
+							<TldrawUiMenuContextProvider type="icons" sourceId="style-panel">
+								{geoShapeItems.map((item) => {
+									const itemTitle = `${msg('style-panel.geo')} - ${msg(
+										`geo-style.${item.value}` as TLUiTranslationKey
+									)}`
+									const isActive = value.type === 'shared' && value.value === item.value
 
-								return (
-									<TldrawUiToolbarButton
-										key={item.value}
-										type="icon"
-										data-testid={`style.geo.${item.value}`}
-										title={itemTitle}
-										isActive={isActive}
-										onClick={() => applyValue(item.value)}
-									>
-										<TldrawUiButtonIcon icon={item.icon} />
-									</TldrawUiToolbarButton>
-								)
-							})}
-						</TldrawUiMenuContextProvider>
-					</TldrawUiToolbar>
+									return (
+										<TldrawUiToolbarButton
+											key={item.value}
+											type="icon"
+											data-testid={`style.geo.${item.value}`}
+											title={itemTitle}
+											isActive={isActive}
+											onClick={() => applyValue(item.value)}
+										>
+											<TldrawUiButtonIcon icon={item.icon} />
+										</TldrawUiToolbarButton>
+									)
+								})}
+							</TldrawUiMenuContextProvider>
+						</TldrawUiToolbar>
+					</div>
 				</TldrawUiPopoverContent>
 			</TldrawUiPopover>
 		</TldrawUiToolbar>
@@ -295,9 +277,7 @@ function GeoShapePicker() {
 function CustomLibraryShapePicker() {
 	const editor = useEditor()
 	const msg = useTranslation()
-	const { onHistoryMark } = useStylePanelContext()
-	const { items, activeItem, activeItemId, setActiveItem, getItem } =
-		useCustomShapeLibrary()
+	const { items, activeItem, activeItemId, setActiveItem, getItem } = useCustomShapeLibrary()
 	const [isOpen, setIsOpen] = useState(false)
 	const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
 
@@ -358,7 +338,7 @@ function CustomLibraryShapePicker() {
 		if (!item) return
 
 		setActiveItem(libraryItemId)
-		onHistoryMark('custom shape library item')
+		editor.markHistoryStoppingPoint('custom shape library item')
 
 		editor.run(() => {
 			const selected = editor
@@ -369,7 +349,10 @@ function CustomLibraryShapePicker() {
 				const geoSelected = selected.filter(isGeoShape)
 				const customSelected = selected.filter(isCustomCanvasShape)
 				const sameTypeSelected = customSelected.filter((shape) => shape.type === item.type)
-				const replacingSelected = [...geoSelected, ...customSelected.filter((shape) => shape.type !== item.type)]
+				const replacingSelected = [
+					...geoSelected,
+					...customSelected.filter((shape) => shape.type !== item.type),
+				]
 
 				if (sameTypeSelected.length > 0) {
 					editor.updateShapes(
@@ -381,7 +364,9 @@ function CustomLibraryShapePicker() {
 					)
 				}
 
-				const replacements = replacingSelected.map((shape) => createCustomShapeFromLibraryItem(shape, item))
+				const replacements = replacingSelected.map((shape) =>
+					createCustomShapeFromLibraryItem(shape, item)
+				)
 				if (replacements.length > 0) {
 					editor.deleteShapes(replacingSelected.map((shape) => shape.id))
 					editor.createShapes(replacements)
@@ -402,12 +387,7 @@ function CustomLibraryShapePicker() {
 	return (
 		<>
 			<TldrawUiToolbar label="Custom shape">
-				<TldrawUiPopover
-					id="style-panel-custom-library-shape-picker"
-					open={isOpen}
-					onOpenChange={setIsOpen}
-					className="tlui-style-panel__dropdown-picker"
-				>
+				<TldrawUiPopover id="style-panel-custom-library-shape-picker" open={isOpen} onOpenChange={setIsOpen}>
 					<TldrawUiPopoverTrigger>
 						<TldrawUiToolbarButton
 							type="menu"
@@ -463,29 +443,17 @@ function CustomLibraryShapePicker() {
 }
 
 function CustomStylePanelContent() {
+	const styles = useRelevantStyles()
+
+	if (!styles) return null
+
 	return (
 		<>
-			<StylePanelSection>
-				<StylePanelColorPicker />
-				<StylePanelOpacityPicker />
-			</StylePanelSection>
-			<StylePanelSection>
-				<StylePanelFillPicker />
-				<StylePanelDashPicker />
-				<StylePanelSizePicker />
-			</StylePanelSection>
-			<StylePanelSection>
-				<StylePanelFontPicker />
-				<StylePanelTextAlignPicker />
-				<StylePanelLabelAlignPicker />
-			</StylePanelSection>
-			<StylePanelSection>
+			<DefaultStylePanelContent styles={styles} />
+			<div className="tlui-style-panel__section">
 				<GeoShapePicker />
 				<CustomLibraryShapePicker />
-				<StylePanelArrowKindPicker />
-				<StylePanelArrowheadPicker />
-				<StylePanelSplinePicker />
-			</StylePanelSection>
+			</div>
 		</>
 	)
 }

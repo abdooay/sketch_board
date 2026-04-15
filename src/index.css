@@ -82,6 +82,12 @@ body {
 	min-width: 200px;
 }
 
+.custom-shape-grid-toolbar .tlui-toolbar {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 8px;
+}
+
 .custom-shape-library-list {
 	display: flex;
 	flex-direction: column;

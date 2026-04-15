@@ -81,28 +81,30 @@ function ShapesToolbarItem() {
 				</TldrawUiToolbarButton>
 			</TldrawUiPopoverTrigger>
 			<TldrawUiPopoverContent side="top" align="center">
-				<TldrawUiToolbar orientation="grid" label={msg('style-panel.geo')}>
-					<TldrawUiMenuContextProvider type="icons" sourceId="toolbar">
-						{geoShapeItems.map((item) => {
-							const itemTitle = `${msg('style-panel.geo')} - ${msg(
-								`geo-style.${item.value}` as TLUiTranslationKey
-							)}`
+				<div className="custom-shape-grid-toolbar">
+					<TldrawUiToolbar label={msg('style-panel.geo')}>
+						<TldrawUiMenuContextProvider type="icons" sourceId="toolbar">
+							{geoShapeItems.map((item) => {
+								const itemTitle = `${msg('style-panel.geo')} - ${msg(
+									`geo-style.${item.value}` as TLUiTranslationKey
+								)}`
 
-							return (
-								<TldrawUiToolbarButton
-									key={item.value}
-									type="icon"
-									title={itemTitle}
-									data-testid={`tools.shapes.${item.value}`}
-									isActive={activeShape === item.value}
-									onClick={() => selectShapeTool(item.value)}
-								>
-									<TldrawUiButtonIcon icon={item.icon} />
-								</TldrawUiToolbarButton>
-							)
-						})}
-					</TldrawUiMenuContextProvider>
-				</TldrawUiToolbar>
+								return (
+									<TldrawUiToolbarButton
+										key={item.value}
+										type="icon"
+										title={itemTitle}
+										data-testid={`tools.shapes.${item.value}`}
+										isActive={activeShape === item.value}
+										onClick={() => selectShapeTool(item.value)}
+									>
+										<TldrawUiButtonIcon icon={item.icon} />
+									</TldrawUiToolbarButton>
+								)
+							})}
+						</TldrawUiMenuContextProvider>
+					</TldrawUiToolbar>
+				</div>
 			</TldrawUiPopoverContent>
 		</TldrawUiPopover>
 	)
