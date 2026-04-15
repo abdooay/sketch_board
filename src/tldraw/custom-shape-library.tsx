@@ -20,8 +20,10 @@ import {
 } from './custom-shape-registry'
 import { setRuntimeCustomShapeLibraryState } from './custom-shape-library-state'
 import {
+	createLibraryItemIdFromText,
 	createLibraryItemIdFromFilename,
 	createLibraryItemLabelFromFilename,
+	extractSvgTextFromMarkup,
 	isSvgFile,
 	sanitizeSvgMarkup,
 } from './svg-import'
@@ -35,12 +37,20 @@ export interface ImportCustomShapeLibraryResult {
 	errors: string[]
 }
 
+export interface ImportCustomShapeLibraryTextInput {
+	name: string
+	text: string
+}
+
 interface CustomShapeLibraryContextValue {
 	items: CustomShapeLibraryItem[]
 	activeItemId: string | null
 	activeItem: CustomShapeLibraryItem | null
 	setActiveItem(id: string): void
 	importItemsFromFiles(files: File[]): Promise<ImportCustomShapeLibraryResult>
+	importItemsFromTextInputs(
+		inputs: ImportCustomShapeLibraryTextInput[]
+	): Promise<ImportCustomShapeLibraryResult>
 	renameItem(id: string, label: string): void
 	deleteItem(id: string): void
 	getItem(id: string | null | undefined): CustomShapeLibraryItem | null
@@ -90,6 +100,72 @@ function upsertLibraryItems(
 	return { nextItems, added, updated }
 }
 
+function createSvgLibraryItemFromSource(
+	name: string,
+	svgSource: Awaited<ReturnType<typeof sanitizeSvgMarkup>>
+): CustomShapeLibraryItem | null {
+	if (!svgSource) return null
+
+	const svgEntry = getCustomShapeRegistryEntry('svg-symbol')
+	const label = createLibraryItemLabelFromFilename(name)
+
+	return {
+		id: createLibraryItemIdFromText(label),
+		type: 'svg-symbol',
+		label,
+		defaultProps: svgEntry.normalizeDefaults({
+			w: svgSource.width,
+			h: svgSource.height,
+		}),
+		source: {
+			kind: 'svg',
+			viewBox: svgSource.viewBox,
+			markup: svgSource.markup,
+		},
+		version: 1,
+	}
+}
+
+function parseImportedJsonText(name: string, text: string, errors: string[]) {
+	const parsedItems: CustomShapeLibraryItem[] = []
+
+	try {
+		const raw = JSON.parse(text) as CustomShapeImportDescriptor | CustomShapeImportDescriptor[]
+		const candidates = Array.isArray(raw) ? raw : [raw]
+
+		for (const candidate of candidates) {
+			const item = normalizeImportedCustomShapeDescriptor(candidate)
+			if (item) {
+				parsedItems.push(item)
+			} else {
+				errors.push(`Skipped invalid item in ${name}`)
+			}
+		}
+	} catch {
+		errors.push(`Could not parse ${name}`)
+	}
+
+	return parsedItems
+}
+
+function mergeImportedItems(
+	currentItems: CustomShapeLibraryItem[],
+	importedItems: CustomShapeLibraryItem[],
+	activeItemId: string | null,
+	setItems: (items: CustomShapeLibraryItem[]) => void,
+	setActiveItemId: (id: string | null) => void
+) {
+	const { nextItems, added, updated } = upsertLibraryItems(currentItems, importedItems)
+	if (importedItems.length > 0) {
+		setItems(nextItems)
+		if (!activeItemId && nextItems[0]) {
+			setActiveItemId(nextItems[0].id)
+		}
+	}
+
+	return { added, updated }
+}
+
 export function CustomShapeLibraryProvider({ children }: { children: ReactNode }) {
 	const [items, setItems] = useState<CustomShapeLibraryItem[]>(() => loadInitialLibraryItems())
 	const [activeItemId, setActiveItemId] = useState<string | null>(() =>
@@ -120,66 +196,69 @@ export function CustomShapeLibraryProvider({ children }: { children: ReactNode }
 
 	const importItemsFromFiles = useCallback(
 		async (files: File[]): Promise<ImportCustomShapeLibraryResult> => {
-			const parsedItems: CustomShapeLibraryItem[] = []
+			const importedItems: CustomShapeLibraryItem[] = []
 			const errors: string[] = []
 
 			for (const file of files) {
 				if (isSvgFile(file)) {
 					try {
 						const svgSource = sanitizeSvgMarkup(await file.text())
-						if (!svgSource) {
+						const svgItem = createSvgLibraryItemFromSource(file.name, svgSource)
+						if (!svgItem) {
 							errors.push(`Could not sanitize ${file.name}`)
 							continue
 						}
-
-						const svgEntry = getCustomShapeRegistryEntry('svg-symbol')
-						parsedItems.push({
-							id: createLibraryItemIdFromFilename(file.name),
-							type: 'svg-symbol',
-							label: createLibraryItemLabelFromFilename(file.name),
-							defaultProps: svgEntry.normalizeDefaults({
-								w: svgSource.width,
-								h: svgSource.height,
-							}),
-							source: {
-								kind: 'svg',
-								viewBox: svgSource.viewBox,
-								markup: svgSource.markup,
-							},
-							version: 1,
-						})
+						svgItem.id = createLibraryItemIdFromFilename(file.name)
+						importedItems.push(svgItem)
 					} catch {
 						errors.push(`Could not parse ${file.name}`)
 					}
 					continue
 				}
 
-				try {
-					const raw = JSON.parse(await file.text()) as
-						| CustomShapeImportDescriptor
-						| CustomShapeImportDescriptor[]
-					const candidates = Array.isArray(raw) ? raw : [raw]
+				importedItems.push(...parseImportedJsonText(file.name, await file.text(), errors))
+			}
 
-					for (const candidate of candidates) {
-						const item = normalizeImportedCustomShapeDescriptor(candidate)
-						if (item) {
-							parsedItems.push(item)
-						} else {
-							errors.push(`Skipped invalid item in ${file.name}`)
-						}
+			const { added, updated } = mergeImportedItems(
+				items,
+				importedItems,
+				activeItemId,
+				setItems,
+				setActiveItemId
+			)
+
+			return { added, updated, errors }
+		},
+		[items, activeItemId]
+	)
+
+	const importItemsFromTextInputs = useCallback(
+		async (inputs: ImportCustomShapeLibraryTextInput[]): Promise<ImportCustomShapeLibraryResult> => {
+			const importedItems: CustomShapeLibraryItem[] = []
+			const errors: string[] = []
+
+			for (const input of inputs) {
+				const svgText = extractSvgTextFromMarkup(input.text)
+				if (svgText) {
+					const svgItem = createSvgLibraryItemFromSource(input.name, sanitizeSvgMarkup(svgText))
+					if (svgItem) {
+						importedItems.push(svgItem)
+					} else {
+						errors.push(`Could not sanitize ${input.name}`)
 					}
-				} catch {
-					errors.push(`Could not parse ${file.name}`)
+					continue
 				}
+
+				importedItems.push(...parseImportedJsonText(input.name, input.text, errors))
 			}
 
-			const { nextItems, added, updated } = upsertLibraryItems(items, parsedItems)
-			if (parsedItems.length > 0) {
-				setItems(nextItems)
-				if (!activeItemId && nextItems[0]) {
-					setActiveItemId(nextItems[0].id)
-				}
-			}
+			const { added, updated } = mergeImportedItems(
+				items,
+				importedItems,
+				activeItemId,
+				setItems,
+				setActiveItemId
+			)
 
 			return { added, updated, errors }
 		},
@@ -232,6 +311,7 @@ export function CustomShapeLibraryProvider({ children }: { children: ReactNode }
 			activeItem,
 			setActiveItem,
 			importItemsFromFiles,
+			importItemsFromTextInputs,
 			renameItem,
 			deleteItem,
 			getItem,
@@ -243,6 +323,7 @@ export function CustomShapeLibraryProvider({ children }: { children: ReactNode }
 			activeItem,
 			setActiveItem,
 			importItemsFromFiles,
+			importItemsFromTextInputs,
 			renameItem,
 			deleteItem,
 			getItem,

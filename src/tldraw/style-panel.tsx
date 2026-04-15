@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useMemo, useState } from 'react'
 import {
 	DefaultStylePanel,
 	GeoShapeGeoStyle,
@@ -30,11 +30,11 @@ import {
 	type TLUiTranslationKey,
 	useEditor,
 	useStylePanelContext,
-	useToasts,
 	useTranslation,
 	useValue,
 } from 'tldraw'
 import { useCustomShapeLibrary } from './custom-shape-library'
+import { CustomShapeImportDialog } from './custom-shape-import-dialog'
 import { CustomShapeLibraryPreview } from './custom-shape-preview'
 import {
 	getCustomShapeRegistryEntry,
@@ -295,12 +295,11 @@ function GeoShapePicker() {
 function CustomLibraryShapePicker() {
 	const editor = useEditor()
 	const msg = useTranslation()
-	const { addToast } = useToasts()
 	const { onHistoryMark } = useStylePanelContext()
-	const { items, activeItem, activeItemId, setActiveItem, getItem, importItemsFromFiles } =
+	const { items, activeItem, activeItemId, setActiveItem, getItem } =
 		useCustomShapeLibrary()
 	const [isOpen, setIsOpen] = useState(false)
-	const fileInputRef = useRef<HTMLInputElement | null>(null)
+	const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
 
 	const value = useValue<SharedMenuValue<string> | null>(
 		'custom library shape picker value',
@@ -400,93 +399,66 @@ function CustomLibraryShapePicker() {
 		setIsOpen(false)
 	}
 
-	const handleImportClick = () => {
-		fileInputRef.current?.click()
-	}
-
-	const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-		const files = Array.from(event.currentTarget.files ?? [])
-		event.currentTarget.value = ''
-		if (files.length === 0) return
-
-		const result = await importItemsFromFiles(files)
-
-		if (result.added > 0 || result.updated > 0) {
-			addToast({
-				severity: 'success',
-				title: 'Custom shape library updated',
-				description: `Added ${result.added}, updated ${result.updated}.`,
-			})
-		}
-
-		if (result.errors.length > 0) {
-			addToast({
-				severity: 'warning',
-				title: 'Some custom shapes were skipped',
-				description: result.errors.join(' '),
-			})
-		}
-	}
-
 	return (
-		<TldrawUiToolbar label="Custom shape">
-			<TldrawUiPopover
-				id="style-panel-custom-library-shape-picker"
-				open={isOpen}
-				onOpenChange={setIsOpen}
-				className="tlui-style-panel__dropdown-picker"
-			>
-				<TldrawUiPopoverTrigger>
-					<TldrawUiToolbarButton
-						type="menu"
-						data-testid="style.custom-library"
-						data-direction="left"
-						title={title}
-					>
-						<TldrawUiButtonLabel>Custom</TldrawUiButtonLabel>
-						<TldrawUiButtonIcon icon={getCustomShapeRegistryEntry(currentItem.type).icon} />
-					</TldrawUiToolbarButton>
-				</TldrawUiPopoverTrigger>
-				<TldrawUiPopoverContent side="left" align="center">
-					<div className="custom-shape-library-menu custom-shape-library-menu--panel">
-						<div className="custom-shape-library-list" role="list" aria-label="Custom shape library">
-							{items.map((item) => (
+		<>
+			<TldrawUiToolbar label="Custom shape">
+				<TldrawUiPopover
+					id="style-panel-custom-library-shape-picker"
+					open={isOpen}
+					onOpenChange={setIsOpen}
+					className="tlui-style-panel__dropdown-picker"
+				>
+					<TldrawUiPopoverTrigger>
+						<TldrawUiToolbarButton
+							type="menu"
+							data-testid="style.custom-library"
+							data-direction="left"
+							title={title}
+						>
+							<TldrawUiButtonLabel>Custom</TldrawUiButtonLabel>
+							<TldrawUiButtonIcon icon={getCustomShapeRegistryEntry(currentItem.type).icon} />
+						</TldrawUiToolbarButton>
+					</TldrawUiPopoverTrigger>
+					<TldrawUiPopoverContent side="left" align="center">
+						<div className="custom-shape-library-menu custom-shape-library-menu--panel">
+							<div className="custom-shape-library-list" role="list" aria-label="Custom shape library">
+								{items.map((item) => (
+									<button
+										key={item.id}
+										type="button"
+										role="listitem"
+										className="custom-shape-library-item"
+										data-active={value.type === 'shared' && value.value === item.id}
+										onClick={() => applyValue(item.id)}
+									>
+										<span className="custom-shape-library-item__icon">
+											<CustomShapeLibraryPreview item={item} />
+										</span>
+										<span className="custom-shape-library-item__label">{item.label}</span>
+									</button>
+								))}
+							</div>
+							<div className="custom-shape-library-actions">
 								<button
-									key={item.id}
 									type="button"
-									role="listitem"
-									className="custom-shape-library-item"
-									data-active={value.type === 'shared' && value.value === item.id}
-									onClick={() => applyValue(item.id)}
+									className="custom-shape-library-action"
+									onClick={() => {
+										setIsOpen(false)
+										setIsImportDialogOpen(true)
+									}}
 								>
-									<span className="custom-shape-library-item__icon">
-										<CustomShapeLibraryPreview item={item} />
-									</span>
-									<span className="custom-shape-library-item__label">{item.label}</span>
+									Import SVG / JSON
 								</button>
-							))}
+							</div>
 						</div>
-						<div className="custom-shape-library-actions">
-							<button
-								type="button"
-								className="custom-shape-library-action"
-								onClick={handleImportClick}
-							>
-								Import SVG / JSON
-							</button>
-						</div>
-						<input
-							ref={fileInputRef}
-							type="file"
-							accept=".svg,.json,image/svg+xml,application/json"
-							multiple
-							hidden
-							onChange={handleFileChange}
-						/>
-					</div>
-				</TldrawUiPopoverContent>
-			</TldrawUiPopover>
-		</TldrawUiToolbar>
+					</TldrawUiPopoverContent>
+				</TldrawUiPopover>
+			</TldrawUiToolbar>
+			<CustomShapeImportDialog
+				open={isImportDialogOpen}
+				onClose={() => setIsImportDialogOpen(false)}
+			/>
+		</>
 	)
 }
 

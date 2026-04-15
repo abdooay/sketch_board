@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useMemo, useState } from 'react'
 import {
 	ArrowToolbarItem,
 	AssetToolbarItem,
@@ -23,11 +23,11 @@ import {
 	TldrawUiToolbarButton,
 	type TLUiTranslationKey,
 	useEditor,
-	useToasts,
 	useTranslation,
 	useValue,
 } from 'tldraw'
 import { useCustomShapeLibrary } from './custom-shape-library'
+import { CustomShapeImportDialog } from './custom-shape-import-dialog'
 import { CustomShapeLibraryPreview } from './custom-shape-preview'
 import { databaseIcon } from './database-icon'
 import { getCustomShapeRegistryEntry } from './custom-shape-registry'
@@ -110,51 +110,21 @@ function ShapesToolbarItem() {
 
 function CustomShapesToolbarItem() {
 	const editor = useEditor()
-	const { addToast } = useToasts()
 	const {
 		items,
 		activeItem,
 		activeItemId,
 		setActiveItem,
-		importItemsFromFiles,
 		renameItem,
 		deleteItem,
 	} = useCustomShapeLibrary()
 	const [isOpen, setIsOpen] = useState(false)
-	const fileInputRef = useRef<HTMLInputElement | null>(null)
+	const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
 
 	const currentItem = activeItem ?? items[0] ?? null
 	const currentIcon = currentItem
 		? getCustomShapeRegistryEntry(currentItem.type).icon
 		: databaseIcon
-
-	const handleImportClick = () => {
-		fileInputRef.current?.click()
-	}
-
-	const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-		const files = Array.from(event.currentTarget.files ?? [])
-		event.currentTarget.value = ''
-		if (files.length === 0) return
-
-		const result = await importItemsFromFiles(files)
-
-		if (result.added > 0 || result.updated > 0) {
-			addToast({
-				severity: 'success',
-				title: 'Custom shape library updated',
-				description: `Added ${result.added}, updated ${result.updated}.`,
-			})
-		}
-
-		if (result.errors.length > 0) {
-			addToast({
-				severity: 'warning',
-				title: 'Some custom shapes were skipped',
-				description: result.errors.join(' '),
-			})
-		}
-	}
 
 	const selectLibraryItem = (id: string) => {
 		const item = items.find((entry) => entry.id === id)
@@ -175,11 +145,7 @@ function CustomShapesToolbarItem() {
 	const handleDelete = () => {
 		if (!currentItem) return
 		if (items.length <= 1) {
-			addToast({
-				severity: 'warning',
-				title: 'Keep at least one custom shape',
-				description: 'Import another custom shape before deleting the last one.',
-			})
+			window.alert('Import another custom shape before deleting the last one.')
 			return
 		}
 		if (!window.confirm(`Delete "${currentItem.label}" from the custom shape library?`)) return
@@ -187,64 +153,69 @@ function CustomShapesToolbarItem() {
 	}
 
 	return (
-		<TldrawUiPopover id="toolbar-custom-shapes" open={isOpen} onOpenChange={setIsOpen}>
-			<TldrawUiPopoverTrigger>
-				<TldrawUiToolbarButton
-					type="tool"
-					title={currentItem ? `Custom shapes - ${currentItem.label}` : 'Custom shapes'}
-					data-testid="tools.custom-shapes"
-					data-value="custom-shapes"
-					isActive={
-						editor.getCurrentToolId() === DATABASE_SHAPE_TYPE ||
-						editor.getCurrentToolId() === SVG_SYMBOL_SHAPE_TYPE
-					}
-				>
-					<TldrawUiButtonIcon icon={currentIcon} />
-				</TldrawUiToolbarButton>
-			</TldrawUiPopoverTrigger>
-			<TldrawUiPopoverContent side="top" align="center">
-				<div className="custom-shape-library-menu">
-					<div className="custom-shape-library-list" role="list" aria-label="Custom shape library">
-						{items.map((item) => {
-							return (
-								<button
-									key={item.id}
-									type="button"
-									role="listitem"
-									className="custom-shape-library-item"
-									data-active={activeItemId === item.id}
-									onClick={() => selectLibraryItem(item.id)}
-								>
-									<span className="custom-shape-library-item__icon">
-										<CustomShapeLibraryPreview item={item} />
-									</span>
-									<span className="custom-shape-library-item__label">{item.label}</span>
-								</button>
-							)
-						})}
+		<>
+			<TldrawUiPopover id="toolbar-custom-shapes" open={isOpen} onOpenChange={setIsOpen}>
+				<TldrawUiPopoverTrigger>
+					<TldrawUiToolbarButton
+						type="tool"
+						title={currentItem ? `Custom shapes - ${currentItem.label}` : 'Custom shapes'}
+						data-testid="tools.custom-shapes"
+						data-value="custom-shapes"
+						isActive={
+							editor.getCurrentToolId() === DATABASE_SHAPE_TYPE ||
+							editor.getCurrentToolId() === SVG_SYMBOL_SHAPE_TYPE
+						}
+					>
+						<TldrawUiButtonIcon icon={currentIcon} />
+					</TldrawUiToolbarButton>
+				</TldrawUiPopoverTrigger>
+				<TldrawUiPopoverContent side="top" align="center">
+					<div className="custom-shape-library-menu">
+						<div className="custom-shape-library-list" role="list" aria-label="Custom shape library">
+							{items.map((item) => {
+								return (
+									<button
+										key={item.id}
+										type="button"
+										role="listitem"
+										className="custom-shape-library-item"
+										data-active={activeItemId === item.id}
+										onClick={() => selectLibraryItem(item.id)}
+									>
+										<span className="custom-shape-library-item__icon">
+											<CustomShapeLibraryPreview item={item} />
+										</span>
+										<span className="custom-shape-library-item__label">{item.label}</span>
+									</button>
+								)
+							})}
+						</div>
+						<div className="custom-shape-library-actions">
+							<button
+								type="button"
+								className="custom-shape-library-action"
+								onClick={() => {
+									setIsOpen(false)
+									setIsImportDialogOpen(true)
+								}}
+							>
+								Import SVG / JSON
+							</button>
+							<button type="button" className="custom-shape-library-action" onClick={handleRename}>
+								Rename
+							</button>
+							<button type="button" className="custom-shape-library-action" onClick={handleDelete}>
+								Delete
+							</button>
+						</div>
 					</div>
-					<div className="custom-shape-library-actions">
-						<button type="button" className="custom-shape-library-action" onClick={handleImportClick}>
-							Import SVG / JSON
-						</button>
-						<button type="button" className="custom-shape-library-action" onClick={handleRename}>
-							Rename
-						</button>
-						<button type="button" className="custom-shape-library-action" onClick={handleDelete}>
-							Delete
-						</button>
-					</div>
-					<input
-						ref={fileInputRef}
-						type="file"
-						accept=".svg,.json,image/svg+xml,application/json"
-						multiple
-						hidden
-						onChange={handleFileChange}
-					/>
-				</div>
-			</TldrawUiPopoverContent>
-		</TldrawUiPopover>
+				</TldrawUiPopoverContent>
+			</TldrawUiPopover>
+			<CustomShapeImportDialog
+				open={isImportDialogOpen}
+				onClose={() => setIsImportDialogOpen(false)}
+			/>
+		</>
 	)
 }
 

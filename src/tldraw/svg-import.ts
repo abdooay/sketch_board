@@ -70,6 +70,13 @@ export interface SanitizedSvgSource {
 	height: number
 }
 
+function createSlug(value: string) {
+	return value
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-+|-+$/g, '')
+}
+
 function parseNumericLength(value: string | null) {
 	if (!value) return null
 	const parsed = Number.parseFloat(value)
@@ -232,10 +239,7 @@ export function isSvgFile(file: File) {
 
 export function createLibraryItemIdFromFilename(filename: string) {
 	const baseName = filename.replace(/\.[^.]+$/, '')
-	const slug = baseName
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '')
+	const slug = createSlug(baseName)
 
 	return slug || 'svg-symbol'
 }
@@ -245,4 +249,29 @@ export function createLibraryItemLabelFromFilename(filename: string) {
 	if (!baseName) return 'SVG Symbol'
 
 	return baseName.replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+export function createLibraryItemIdFromText(label: string) {
+	const slug = createSlug(label)
+	const suffix =
+		typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+			? crypto.randomUUID().slice(0, 8)
+			: Math.random().toString(36).slice(2, 10)
+
+	return `${slug || 'svg-symbol'}-${suffix}`
+}
+
+export function extractSvgTextFromMarkup(rawText: string) {
+	const trimmed = rawText.trim()
+	if (!trimmed) return null
+
+	if (trimmed.startsWith('<svg') && trimmed.includes('</svg>')) {
+		return trimmed
+	}
+
+	if (!trimmed.includes('<svg')) return null
+
+	const html = new DOMParser().parseFromString(trimmed, 'text/html')
+	const svgElement = html.querySelector('svg')
+	return svgElement?.outerHTML ?? null
 }
