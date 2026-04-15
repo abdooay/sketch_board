@@ -15,11 +15,9 @@ import {
 	SelectToolbarItem,
 	TextToolbarItem,
 	TldrawUiButtonIcon,
-	TldrawUiMenuContextProvider,
 	TldrawUiPopover,
 	TldrawUiPopoverContent,
 	TldrawUiPopoverTrigger,
-	TldrawUiToolbar,
 	TldrawUiToolbarButton,
 	type TLUiTranslationKey,
 	useEditor,
@@ -81,29 +79,28 @@ function ShapesToolbarItem() {
 				</TldrawUiToolbarButton>
 			</TldrawUiPopoverTrigger>
 			<TldrawUiPopoverContent side="top" align="center">
-				<div className="custom-shape-grid-toolbar">
-					<TldrawUiToolbar label={msg('style-panel.geo')}>
-						<TldrawUiMenuContextProvider type="icons" sourceId="toolbar">
-							{geoShapeItems.map((item) => {
-								const itemTitle = `${msg('style-panel.geo')} - ${msg(
-									`geo-style.${item.value}` as TLUiTranslationKey
-								)}`
+				<div className="custom-shape-grid" role="menu" aria-label={msg('style-panel.geo')}>
+					{geoShapeItems.map((item) => {
+						const itemTitle = `${msg('style-panel.geo')} - ${msg(
+							`geo-style.${item.value}` as TLUiTranslationKey
+						)}`
 
-								return (
-									<TldrawUiToolbarButton
-										key={item.value}
-										type="icon"
-										title={itemTitle}
-										data-testid={`tools.shapes.${item.value}`}
-										isActive={activeShape === item.value}
-										onClick={() => selectShapeTool(item.value)}
-									>
-										<TldrawUiButtonIcon icon={item.icon} />
-									</TldrawUiToolbarButton>
-								)
-							})}
-						</TldrawUiMenuContextProvider>
-					</TldrawUiToolbar>
+						return (
+							<button
+								key={item.value}
+								type="button"
+								role="menuitemradio"
+								aria-checked={activeShape === item.value}
+								className="custom-shape-grid__button"
+								title={itemTitle}
+								data-testid={`tools.shapes.${item.value}`}
+								data-active={activeShape === item.value}
+								onClick={() => selectShapeTool(item.value)}
+							>
+								<TldrawUiButtonIcon icon={item.icon} />
+							</button>
+						)
+					})}
 				</div>
 			</TldrawUiPopoverContent>
 		</TldrawUiPopover>
@@ -201,7 +198,7 @@ function CustomShapesToolbarItem() {
 									setIsImportDialogOpen(true)
 								}}
 							>
-								Import SVG / JSON
+								Import SVG
 							</button>
 							<button type="button" className="custom-shape-library-action" onClick={handleRename}>
 								Rename

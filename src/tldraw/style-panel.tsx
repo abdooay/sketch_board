@@ -5,7 +5,6 @@ import {
 	GeoShapeGeoStyle,
 	TldrawUiButtonIcon,
 	TldrawUiButtonLabel,
-	TldrawUiMenuContextProvider,
 	TldrawUiPopover,
 	TldrawUiPopoverContent,
 	TldrawUiPopoverTrigger,
@@ -138,6 +137,19 @@ function GeoShapePicker() {
 	const editor = useEditor()
 	const msg = useTranslation()
 	const [isOpen, setIsOpen] = useState(false)
+	const shouldShowForCustomState = useValue(
+		'show custom geo shape picker',
+		() => {
+			if (editor.isIn('select')) {
+				const selected = editor.getSelectedShapes()
+				return selected.length > 0 && selected.some(isCustomCanvasShape)
+			}
+
+			const currentTool = editor.getCurrentToolId()
+			return currentTool === DATABASE_SHAPE_TYPE || currentTool === SVG_SYMBOL_SHAPE_TYPE
+		},
+		[editor]
+	)
 
 	const value = useValue<SharedMenuValue<GeoShapeMenuValue> | null>(
 		'geo shape picker value',
@@ -181,14 +193,14 @@ function GeoShapePicker() {
 		return geoShapeItems.find((item) => item.value === value.value) ?? null
 	}, [value])
 
-	if (!value) return null
+	if (!value || !shouldShowForCustomState) return null
 
 	const title =
 		value.type === 'mixed'
 			? `${msg('style-panel.geo')} - ${msg('style-panel.mixed')}`
 			: `${msg('style-panel.geo')} - ${msg(
-					`geo-style.${value.value}` as TLUiTranslationKey
-				)}`
+				`geo-style.${value.value}` as TLUiTranslationKey
+			)}`
 
 	const applyValue = (nextValue: GeoShapeMenuValue) => {
 		editor.markHistoryStoppingPoint('geo shape picker item')
@@ -243,30 +255,29 @@ function GeoShapePicker() {
 					</TldrawUiToolbarButton>
 				</TldrawUiPopoverTrigger>
 				<TldrawUiPopoverContent side="left" align="center">
-					<div className="custom-shape-grid-toolbar">
-						<TldrawUiToolbar label={msg('style-panel.geo')}>
-							<TldrawUiMenuContextProvider type="icons" sourceId="style-panel">
-								{geoShapeItems.map((item) => {
-									const itemTitle = `${msg('style-panel.geo')} - ${msg(
-										`geo-style.${item.value}` as TLUiTranslationKey
-									)}`
-									const isActive = value.type === 'shared' && value.value === item.value
+					<div className="custom-shape-grid" role="menu" aria-label={msg('style-panel.geo')}>
+						{geoShapeItems.map((item) => {
+							const itemTitle = `${msg('style-panel.geo')} - ${msg(
+								`geo-style.${item.value}` as TLUiTranslationKey
+							)}`
+							const isActive = value.type === 'shared' && value.value === item.value
 
-									return (
-										<TldrawUiToolbarButton
-											key={item.value}
-											type="icon"
-											data-testid={`style.geo.${item.value}`}
-											title={itemTitle}
-											isActive={isActive}
-											onClick={() => applyValue(item.value)}
-										>
-											<TldrawUiButtonIcon icon={item.icon} />
-										</TldrawUiToolbarButton>
-									)
-								})}
-							</TldrawUiMenuContextProvider>
-						</TldrawUiToolbar>
+							return (
+								<button
+									key={item.value}
+									type="button"
+									role="menuitemradio"
+									aria-checked={isActive}
+									className="custom-shape-grid__button"
+									data-testid={`style.geo.${item.value}`}
+									title={itemTitle}
+									data-active={isActive}
+									onClick={() => applyValue(item.value)}
+								>
+									<TldrawUiButtonIcon icon={item.icon} />
+								</button>
+							)
+						})}
 					</div>
 				</TldrawUiPopoverContent>
 			</TldrawUiPopover>
@@ -427,7 +438,7 @@ function CustomLibraryShapePicker() {
 										setIsImportDialogOpen(true)
 									}}
 								>
-									Import SVG / JSON
+									Import SVG
 								</button>
 							</div>
 						</div>
