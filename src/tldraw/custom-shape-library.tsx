@@ -117,13 +117,14 @@ function createSvgLibraryItemFromSource(
 			w: svgSource.width,
 			h: svgSource.height,
 		}),
-		source: {
-			kind: 'svg',
-			viewBox: svgSource.viewBox,
-			markup: svgSource.markup,
-		},
-		version: 1,
-	}
+							source: {
+								kind: 'svg',
+								viewBox: svgSource.viewBox,
+								markup: svgSource.markup,
+								contrastTone: svgSource.contrastTone,
+							},
+							version: 1,
+						}
 }
 
 function parseImportedJsonText(name: string, text: string, errors: string[]) {

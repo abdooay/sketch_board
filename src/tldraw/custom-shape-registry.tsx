@@ -7,6 +7,7 @@ import { databaseIcon } from './database-icon'
 import {
 	normalizeImportedSvgSource,
 	type SanitizedSvgSource,
+	type SvgContrastTone,
 } from './svg-import'
 import { svgSymbolIcon } from './svg-symbol-icon'
 import { DATABASE_SHAPE_TYPE } from './shapes/DatabaseShape'
@@ -33,6 +34,7 @@ export interface SvgSymbolLibrarySource {
 	kind: 'svg'
 	viewBox: string
 	markup: string
+	contrastTone: SvgContrastTone
 }
 
 export interface DatabaseImportDescriptor {
@@ -176,6 +178,7 @@ function toSvgLibrarySource(source: SanitizedSvgSource): SvgSymbolLibrarySource 
 		kind: 'svg',
 		viewBox: source.viewBox,
 		markup: source.markup,
+		contrastTone: source.contrastTone,
 	}
 }
 

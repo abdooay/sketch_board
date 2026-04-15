@@ -1,6 +1,9 @@
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg'
 const DEFAULT_SVG_WIDTH = 240
 const DEFAULT_SVG_HEIGHT = 160
+const GRAYSCALE_TOLERANCE = 12
+const DARK_TONE_THRESHOLD = 0.35
+const LIGHT_TONE_THRESHOLD = 0.65
 
 const ALLOWED_ELEMENTS = new Set([
 	'g',
@@ -68,7 +71,10 @@ export interface SanitizedSvgSource {
 	markup: string
 	width: number
 	height: number
+	contrastTone: SvgContrastTone
 }
+
+export type SvgContrastTone = 'none' | 'dark' | 'light' | 'current'
 
 function createSlug(value: string) {
 	return value
@@ -116,6 +122,147 @@ function sanitizeStyle(styleText: string) {
 	}
 
 	return safeDeclarations.join(';')
+}
+
+function getCanvasColorContext() {
+	const canvas = document.createElement('canvas')
+	canvas.width = 1
+	canvas.height = 1
+	return canvas.getContext('2d')
+}
+
+function parseResolvedColor(value: string) {
+	const context = getCanvasColorContext()
+	if (!context) return null
+
+	try {
+		context.fillStyle = '#000000'
+		context.fillStyle = value
+	} catch {
+		return null
+	}
+
+	const resolved = context.fillStyle
+	if (typeof resolved !== 'string') return null
+
+	const rgbaMatch = resolved.match(
+		/^rgba?\(\s*([0-9.]+)[,\s]+([0-9.]+)[,\s]+([0-9.]+)(?:[,\s/]+([0-9.]+))?\s*\)$/i
+	)
+
+	if (rgbaMatch) {
+		const [, r, g, b, a] = rgbaMatch
+		return {
+			r: Number.parseFloat(r),
+			g: Number.parseFloat(g),
+			b: Number.parseFloat(b),
+			a: a === undefined ? 1 : Number.parseFloat(a),
+		}
+	}
+
+	const hexMatch = resolved.match(/^#([0-9a-f]{6}|[0-9a-f]{3})$/i)
+	if (!hexMatch) return null
+
+	const hex = hexMatch[1]
+	const expanded = hex.length === 3 ? hex.split('').map((part) => `${part}${part}`).join('') : hex
+
+	return {
+		r: Number.parseInt(expanded.slice(0, 2), 16),
+		g: Number.parseInt(expanded.slice(2, 4), 16),
+		b: Number.parseInt(expanded.slice(4, 6), 16),
+		a: 1,
+	}
+}
+
+function getColorLuminance(color: { r: number; g: number; b: number }) {
+	return (0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b) / 255
+}
+
+function collectStyleDeclarationColors(styleText: string) {
+	const colors: string[] = []
+	let usesCurrentColor = false
+
+	for (const declaration of styleText.split(';')) {
+		const [rawProperty, ...rawValueParts] = declaration.split(':')
+		if (!rawProperty || rawValueParts.length === 0) continue
+
+		const property = rawProperty.trim().toLowerCase()
+		if (property !== 'fill' && property !== 'stroke' && property !== 'color') continue
+
+		const value = rawValueParts.join(':').trim().toLowerCase()
+		if (!value || value === 'none' || value === 'transparent' || value === 'inherit') continue
+		if (value === 'currentcolor') {
+			usesCurrentColor = true
+			continue
+		}
+
+		colors.push(value)
+	}
+
+	return { colors, usesCurrentColor }
+}
+
+function getSvgContrastTone(markup: string) {
+	const parser = new DOMParser()
+	const parsed = parser.parseFromString(
+		`<svg xmlns="${SVG_NAMESPACE}">${markup}</svg>`,
+		'image/svg+xml'
+	)
+	if (parsed.querySelector('parsererror')) return 'none' as const
+
+	const colors: string[] = []
+	let usesCurrentColor = false
+
+	for (const element of Array.from(parsed.documentElement.querySelectorAll('*'))) {
+		for (const attributeName of ['fill', 'stroke', 'color']) {
+			const rawValue = element.getAttribute(attributeName)?.trim().toLowerCase()
+			if (!rawValue || rawValue === 'none' || rawValue === 'transparent' || rawValue === 'inherit') {
+				continue
+			}
+
+			if (rawValue === 'currentcolor') {
+				usesCurrentColor = true
+				continue
+			}
+
+			colors.push(rawValue)
+		}
+
+		const styleText = element.getAttribute('style')
+		if (styleText) {
+			const styleColors = collectStyleDeclarationColors(styleText)
+			colors.push(...styleColors.colors)
+			usesCurrentColor = usesCurrentColor || styleColors.usesCurrentColor
+		}
+	}
+
+	if (colors.length === 0) {
+		return usesCurrentColor ? ('current' as const) : ('none' as const)
+	}
+
+	const luminances: number[] = []
+	for (const colorValue of colors) {
+		const resolved = parseResolvedColor(colorValue)
+		if (!resolved || resolved.a === 0) continue
+
+		const minChannel = Math.min(resolved.r, resolved.g, resolved.b)
+		const maxChannel = Math.max(resolved.r, resolved.g, resolved.b)
+		if (maxChannel - minChannel > GRAYSCALE_TOLERANCE) {
+			return 'none'
+		}
+
+		luminances.push(getColorLuminance(resolved))
+	}
+
+	if (luminances.length === 0) {
+		return usesCurrentColor ? ('current' as const) : ('none' as const)
+	}
+
+	const averageLuminance =
+		luminances.reduce((total, value) => total + value, 0) / luminances.length
+
+	if (averageLuminance <= DARK_TONE_THRESHOLD) return 'dark'
+	if (averageLuminance >= LIGHT_TONE_THRESHOLD) return 'light'
+	return 'none'
 }
 
 function sanitizeAttributeValue(name: string, value: string) {
@@ -218,6 +365,7 @@ export function sanitizeSvgMarkup(rawSvg: string): SanitizedSvgSource | null {
 		markup,
 		width: svgSize.width,
 		height: svgSize.height,
+		contrastTone: getSvgContrastTone(markup),
 	}
 }
 

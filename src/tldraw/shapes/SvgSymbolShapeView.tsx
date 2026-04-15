@@ -1,5 +1,6 @@
 import { SVGContainer } from 'tldraw'
 import { useCustomShapeLibrary } from '../custom-shape-library'
+import { useSvgContrastStyle } from '../svg-contrast'
 import type { SvgSymbolShape } from './SvgSymbolShape'
 
 export function SvgSymbolShapeView({ shape }: { shape: SvgSymbolShape }) {
@@ -7,6 +8,9 @@ export function SvgSymbolShapeView({ shape }: { shape: SvgSymbolShape }) {
 	const libraryItem = getItem(shape.props.libraryItemId)
 	const width = Number.isFinite(shape.props.w) ? Math.max(shape.props.w, 1) : 1
 	const height = Number.isFinite(shape.props.h) ? Math.max(shape.props.h, 1) : 1
+	const contrastStyle = useSvgContrastStyle(
+		libraryItem && libraryItem.type === 'svg-symbol' ? libraryItem.source.contrastTone : 'none'
+	)
 
 	if (!libraryItem || libraryItem.type !== 'svg-symbol') {
 		return (
@@ -42,6 +46,7 @@ export function SvgSymbolShapeView({ shape }: { shape: SvgSymbolShape }) {
 				height={height}
 				viewBox={libraryItem.source.viewBox}
 				preserveAspectRatio="xMidYMid meet"
+				style={contrastStyle}
 				dangerouslySetInnerHTML={{ __html: libraryItem.source.markup }}
 			/>
 		</SVGContainer>
