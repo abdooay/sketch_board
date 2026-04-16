@@ -5,6 +5,7 @@ import {
 	toRichText,
 } from 'tldraw'
 import type { TLShape, TLShapeId } from 'tldraw'
+import { getIndices } from '@tldraw/utils'
 import {
 	DEFAULT_DATABASE_LIBRARY_ITEM_ID,
 	type CustomShapeLibraryItem,
@@ -28,6 +29,14 @@ type ShapePatch = Partial<TLShape> & {
 	props?: Record<string, unknown>
 	meta?: Record<string, unknown>
 }
+
+const TL_COLOR_ALIASES: Record<string, string> = Object.freeze({
+	'gray': 'grey',
+	'light-gray': 'grey',
+	'light-grey': 'grey',
+	'purple': 'violet',
+	'light-purple': 'light-violet',
+})
 
 export async function handleCanvasCommand(editor: Editor, cmd: CanvasCommand): Promise<CanvasResponse> {
 	const base = {
@@ -196,15 +205,18 @@ export function normalizeShapeProps(
 		...toJsonObject(input.props ?? {}),
 	}
 
-	if (input.width !== undefined) {
+	if (input.width !== undefined && supportsWidthAlias(shapeType)) {
 		props.w = input.width
 		if (shapeType === 'text' && input.props?.autoSize === undefined) {
 			props.autoSize = false
 		}
 	}
 
-	if (input.height !== undefined) props.h = input.height
-	if (input.color !== undefined) props.color = input.color
+	if (input.height !== undefined && supportsHeightAlias(shapeType)) props.h = input.height
+	if (typeof props.color === 'string') {
+		props.color = normalizeTldrawColor(props.color)
+	}
+	if (input.color !== undefined) props.color = normalizeTldrawColor(input.color)
 	if (input.fill !== undefined) props.fill = input.fill
 	if (input.geo !== undefined && shapeType === 'geo') props.geo = input.geo
 	if (input.name !== undefined && shapeType === 'frame') props.name = input.name
@@ -222,6 +234,9 @@ export function normalizeShapeProps(
 	if (shapeType === 'arrow') {
 		normalizeLegacyArrowProps(props)
 	}
+	if (shapeType === 'line') {
+		normalizeLineProps(props)
+	}
 
 	return props
 }
@@ -234,6 +249,29 @@ function supportsPlainTextAlias(shapeType: string) {
 	return shapeType === 'arrow'
 }
 
+function supportsWidthAlias(shapeType: string) {
+	return (
+		shapeType === 'geo' ||
+		shapeType === 'text' ||
+		shapeType === 'frame' ||
+		shapeType === 'embed' ||
+		shapeType === 'image' ||
+		shapeType === 'video' ||
+		shapeType === 'bookmark'
+	)
+}
+
+function supportsHeightAlias(shapeType: string) {
+	return (
+		shapeType === 'geo' ||
+		shapeType === 'frame' ||
+		shapeType === 'embed' ||
+		shapeType === 'image' ||
+		shapeType === 'video' ||
+		shapeType === 'bookmark'
+	)
+}
+
 function normalizeLegacyArrowProps(props: Record<string, unknown>) {
 	if ('elbowed' in props) {
 		if (props.kind === undefined && typeof props.elbowed === 'boolean') {
@@ -241,6 +279,86 @@ function normalizeLegacyArrowProps(props: Record<string, unknown>) {
 		}
 		delete props.elbowed
 	}
+}
+
+function normalizeTldrawColor(value: string) {
+	const normalized = value.trim().toLowerCase()
+	return TL_COLOR_ALIASES[normalized] ?? normalized
+}
+
+function normalizeLineProps(props: Record<string, unknown>) {
+	const rawPoints = props.points
+	if (!rawPoints) return
+
+	if (Array.isArray(rawPoints)) {
+		props.points = normalizeLinePointsArray(rawPoints)
+		return
+	}
+
+	if (typeof rawPoints === 'object') {
+		props.points = normalizeLinePointsRecord(rawPoints as Record<string, unknown>)
+	}
+}
+
+function normalizeLinePointsArray(rawPoints: unknown[]) {
+	const points = rawPoints
+		.map((point) => normalizeLoosePoint(point))
+		.filter((point): point is { x: number; y: number } => point !== null)
+
+	const indices = getIndices(points.length)
+
+	return Object.fromEntries(
+		points.map((point, index) => {
+			const id = indices[index]
+			return [
+				id,
+				{
+					id,
+					index: id,
+					x: point.x,
+					y: point.y,
+				},
+			]
+		})
+	)
+}
+
+function normalizeLinePointsRecord(rawPoints: Record<string, unknown>) {
+	const entries = Object.entries(rawPoints).map(([key, value]) => {
+		const point = normalizeLoosePoint(value)
+		if (!point) return null
+
+		const existing = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+		const id =
+			typeof existing.id === 'string' && existing.id.trim().length > 0 ? existing.id : key
+		const index =
+			typeof existing.index === 'string' && existing.index.trim().length > 0
+				? existing.index
+				: id
+
+		return [
+			id,
+			{
+				id,
+				index,
+				x: point.x,
+				y: point.y,
+			},
+		] as const
+	})
+
+	return Object.fromEntries(entries.filter((entry): entry is NonNullable<typeof entry> => entry !== null))
+}
+
+function normalizeLoosePoint(value: unknown) {
+	if (!value || typeof value !== 'object') return null
+
+	const point = value as Record<string, unknown>
+	const x = typeof point.x === 'number' && Number.isFinite(point.x) ? point.x : null
+	const y = typeof point.y === 'number' && Number.isFinite(point.y) ? point.y : null
+
+	if (x === null || y === null) return null
+	return { x, y }
 }
 
 async function createShapeFromInput(editor: Editor, input: TldrawShapeInput) {

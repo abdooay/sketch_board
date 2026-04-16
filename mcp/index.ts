@@ -63,7 +63,7 @@ server.tool(
 	{},
 	async () => {
 		try {
-			return textResult(JSON.stringify(bridge.listSessions(), null, 2))
+			return textResult(JSON.stringify(await bridge.listSessions(), null, 2))
 		} catch (error) {
 			return errorResult(error)
 		}
@@ -76,7 +76,7 @@ server.tool(
 	genericShapeArgs,
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			const shape = GenericShapeInputSchema.parse(args)
 			const result = await bridge.createShape(sessionId, shape)
 			return textResult(JSON.stringify({ sessionId, id: result.id }, null, 2))
@@ -104,7 +104,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			const shape = CustomShapeInputSchema.parse(args)
 			const result = await bridge.createCustomShape(sessionId, shape)
 			return textResult(JSON.stringify({ sessionId, id: result.id }, null, 2))
@@ -138,7 +138,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			const { id, ...updates } = z
 				.object({
 					sessionId: z.string().optional(),
@@ -178,7 +178,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			await bridge.deleteShapes(sessionId, args.ids)
 			return textResult(JSON.stringify({ sessionId, ids: args.ids }, null, 2))
 		} catch (error) {
@@ -199,7 +199,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			const result = await bridge.connectShapes(sessionId, args.from, args.to, args.label, args.props)
 			return textResult(JSON.stringify({ sessionId, id: result.id }, null, 2))
 		} catch (error) {
@@ -217,7 +217,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			const result = await bridge.groupShapes(sessionId, args.ids)
 			return textResult(JSON.stringify({ sessionId, id: result.id }, null, 2))
 		} catch (error) {
@@ -235,7 +235,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			await bridge.ungroupShapes(sessionId, args.ids)
 			return textResult(JSON.stringify({ sessionId, ids: args.ids }, null, 2))
 		} catch (error) {
@@ -252,7 +252,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			const snapshot = await bridge.getSnapshot(sessionId)
 			return textResult(JSON.stringify({ sessionId, ...snapshot }, null, 2))
 		} catch (error) {
@@ -270,7 +270,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			const items = await bridge.listCustomShapeLibraryItems(sessionId, args.shapeType)
 			return textResult(JSON.stringify({ sessionId, items }, null, 2))
 		} catch (error) {
@@ -287,7 +287,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			await bridge.zoomToFit(sessionId)
 			return textResult(JSON.stringify({ sessionId, ok: true }, null, 2))
 		} catch (error) {
@@ -304,7 +304,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			await bridge.clearCanvas(sessionId)
 			return textResult(JSON.stringify({ sessionId, ok: true }, null, 2))
 		} catch (error) {
@@ -325,7 +325,7 @@ server.tool(
 	},
 	async (args) => {
 		try {
-			const sessionId = resolveSessionId(args.sessionId)
+			const sessionId = await resolveSessionId(args.sessionId)
 			const result = await bridge.exportCanvas(
 				sessionId,
 				args.format,
@@ -351,10 +351,10 @@ function getBridgePort() {
 	return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_WS_PORT
 }
 
-function resolveSessionId(explicitSessionId?: string) {
+async function resolveSessionId(explicitSessionId?: string) {
 	if (explicitSessionId) return explicitSessionId
 
-	const sessions = bridge.listSessions()
+	const sessions = await bridge.listSessions()
 	if (sessions.length === 0) {
 		throw new Error(
 			'No Sketch Board sessions are connected. Open the app locally and ensure the automation bridge is running.'
