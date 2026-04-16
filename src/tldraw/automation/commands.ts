@@ -63,7 +63,7 @@ export async function handleCanvasCommand(editor: Editor, cmd: CanvasCommand): P
 					return errorResponse(base, 'Shape not found')
 				}
 
-				const patch = buildShapePatch(cmd.updates, cmd.updates.type ?? shape.type, shape)
+				const patch = buildShapePatch(editor, cmd.updates, cmd.updates.type ?? shape.type, shape)
 				editor.updateShape({
 					id: shape.id,
 					type: shape.type,
@@ -168,6 +168,7 @@ export async function handleCanvasCommand(editor: Editor, cmd: CanvasCommand): P
 }
 
 export function buildShapePatch(
+	editor: Editor,
 	input: Partial<TldrawShapeInput> | TldrawShapeUpdate,
 	shapeType: string,
 	existingShape?: TLShape
@@ -186,7 +187,7 @@ export function buildShapePatch(
 		}
 	}
 
-	const props = normalizeShapeProps(input, shapeType)
+	const props = normalizeShapeProps(editor, input, shapeType)
 	if (Object.keys(props).length > 0) {
 		patch.props = {
 			...toJsonObject(existingShape?.props ?? {}),
@@ -198,35 +199,39 @@ export function buildShapePatch(
 }
 
 export function normalizeShapeProps(
+	editor: Editor,
 	input: Partial<TldrawShapeInput> | TldrawShapeUpdate,
 	shapeType: string
 ): Record<string, unknown> {
-	const props: Record<string, unknown> = {
+	const allowedPropKeys = getAllowedShapePropKeys(editor, shapeType)
+	const props: Record<string, unknown> = sanitizeShapeProps(allowedPropKeys, {
 		...toJsonObject(input.props ?? {}),
-	}
+	})
 
-	if (input.width !== undefined && supportsWidthAlias(shapeType)) {
+	if (input.width !== undefined && allowedPropKeys.has('w')) {
 		props.w = input.width
-		if (shapeType === 'text' && input.props?.autoSize === undefined) {
+		if (allowedPropKeys.has('autoSize') && input.props?.autoSize === undefined) {
 			props.autoSize = false
 		}
 	}
 
-	if (input.height !== undefined && supportsHeightAlias(shapeType)) props.h = input.height
-	if (typeof props.color === 'string') {
+	if (input.height !== undefined && allowedPropKeys.has('h')) props.h = input.height
+	if (typeof props.color === 'string' && allowedPropKeys.has('color')) {
 		props.color = normalizeTldrawColor(props.color)
 	}
-	if (input.color !== undefined) props.color = normalizeTldrawColor(input.color)
-	if (input.fill !== undefined) props.fill = input.fill
-	if (input.geo !== undefined && shapeType === 'geo') props.geo = input.geo
-	if (input.name !== undefined && shapeType === 'frame') props.name = input.name
-	if (input.url !== undefined) props.url = input.url
+	if (input.color !== undefined && allowedPropKeys.has('color')) {
+		props.color = normalizeTldrawColor(input.color)
+	}
+	if (input.fill !== undefined && allowedPropKeys.has('fill')) props.fill = input.fill
+	if (input.geo !== undefined && allowedPropKeys.has('geo')) props.geo = input.geo
+	if (input.name !== undefined && allowedPropKeys.has('name')) props.name = input.name
+	if (input.url !== undefined && allowedPropKeys.has('url')) props.url = input.url
 
 	if (input.text !== undefined) {
-		if (supportsRichTextAlias(shapeType)) {
+		if (allowedPropKeys.has('richText')) {
 			props.richText = toRichText(input.text)
 		}
-		if (supportsPlainTextAlias(shapeType)) {
+		if (allowedPropKeys.has('text')) {
 			props.text = input.text
 		}
 	}
@@ -241,34 +246,14 @@ export function normalizeShapeProps(
 	return props
 }
 
-function supportsRichTextAlias(shapeType: string) {
-	return shapeType === 'geo' || shapeType === 'text' || shapeType === 'note'
+function getAllowedShapePropKeys(editor: Editor, shapeType: string) {
+	const defaultProps = editor.getShapeUtil(shapeType).getDefaultProps() as Record<string, unknown>
+	return new Set(Object.keys(defaultProps))
 }
 
-function supportsPlainTextAlias(shapeType: string) {
-	return shapeType === 'arrow'
-}
-
-function supportsWidthAlias(shapeType: string) {
-	return (
-		shapeType === 'geo' ||
-		shapeType === 'text' ||
-		shapeType === 'frame' ||
-		shapeType === 'embed' ||
-		shapeType === 'image' ||
-		shapeType === 'video' ||
-		shapeType === 'bookmark'
-	)
-}
-
-function supportsHeightAlias(shapeType: string) {
-	return (
-		shapeType === 'geo' ||
-		shapeType === 'frame' ||
-		shapeType === 'embed' ||
-		shapeType === 'image' ||
-		shapeType === 'video' ||
-		shapeType === 'bookmark'
+function sanitizeShapeProps(allowedPropKeys: Set<string>, props: Record<string, unknown>) {
+	return Object.fromEntries(
+		Object.entries(props).filter(([key]) => allowedPropKeys.has(key))
 	)
 }
 
@@ -363,7 +348,7 @@ function normalizeLoosePoint(value: unknown) {
 
 async function createShapeFromInput(editor: Editor, input: TldrawShapeInput) {
 	const id = createShapeId()
-	const patch = buildShapePatch(input, input.type)
+	const patch = buildShapePatch(editor, input, input.type)
 
 	editor.createShape({
 		id,
@@ -384,10 +369,10 @@ async function createShapeFromInput(editor: Editor, input: TldrawShapeInput) {
 function createCustomShape(editor: Editor, input: CustomShapeInput) {
 	const id = createShapeId()
 	const libraryItem = getRequestedLibraryItem(input)
-	const props = {
+	const props = sanitizeShapeProps(getAllowedShapePropKeys(editor, input.type), {
 		...getDefaultCustomShapeProps(input.type, libraryItem),
 		...toJsonObject(input.props ?? {}),
-	}
+	})
 
 	if (input.width !== undefined) props.w = input.width
 	if (input.height !== undefined) props.h = input.height
