@@ -18,13 +18,15 @@ The project is intended to be reusable. You can fork it, adapt it, and use it as
   - clipboard paste of raw SVG or copied web content containing SVG
 - Theme-aware SVG contrast adjustment for monochrome icons
 - Canvas persistence across page refreshes via `tldraw` local persistence
+- Optional live collaboration through a separately deployed tldraw sync server
 
 ## Stack
 
 - `React 19`
 - `TypeScript`
 - `Vite`
-- `tldraw 4.5.9`
+- `tldraw 3.15.4`
+- `@tldraw/sync 3.15.4` for optional live collaboration
 
 ## Project Structure
 
@@ -58,6 +60,8 @@ src/
 npm install
 cp .env.example .env.local
 ```
+
+`VITE_TLDRAW_SYNC_URL` is optional. Leave it empty unless you have a running tldraw sync server.
 
 ### Start The Dev Server
 
@@ -96,7 +100,7 @@ Current supported custom library item types:
 
 ### Import Options
 
-Open `Import SVG / JSON` from the custom shape controls and use any of these:
+Open `Import SVG` from the custom shape controls and use any of these:
 
 - choose files from disk
 - drag and drop `.svg` or `.json`
@@ -134,14 +138,8 @@ Open `Import SVG / JSON` from the custom shape controls and use any of these:
 
 This project works as a standard Vite deployment on Vercel.
 
-Important:
-Production deployment is also subject to the `tldraw SDK License`.
-According to the official tldraw docs, production use requires a valid `trial`, `hobby`, or `commercial` license key, and commercial production use requires a `commercial` tldraw license.
-See:
-
-- https://tldraw.dev/sdk-features/license-key
-- https://tldraw.dev/legal/tldraw-license
-- https://tldraw.dev/community/license
+This branch uses `tldraw` 3.x. It does not require `VITE_TLDRAW_LICENSE_KEY`, but the
+`Made with tldraw` watermark must remain visible unless your tldraw license allows removing it.
 
 Recommended Vercel settings:
 
@@ -150,9 +148,14 @@ Recommended Vercel settings:
 - Build Command: `npm run build`
 - Output Directory: `dist`
 
-Required environment variable:
+Optional environment variable:
 
-- `VITE_TLDRAW_LICENSE_KEY`
+- `VITE_TLDRAW_SYNC_URL`: base URL for your external tldraw sync server, for example `https://sketch-board-sync.example.com`
+
+Vercel should host the frontend only. The live collaboration feature uses WebSockets, so the
+tldraw sync server must run on a platform that supports persistent WebSocket connections.
+If `VITE_TLDRAW_SYNC_URL` is not set in production, the app still works for local drawing and
+persistence, but the Share Session control shows `Configure sync` instead of starting a room.
 
 #### Dashboard Flow
 
@@ -160,9 +163,11 @@ Required environment variable:
 2. Go to `https://vercel.com/new`.
 3. Import the GitHub repository.
 4. Confirm the Vite settings above.
-5. Open `Settings` -> `Environment Variables`.
-6. Add `VITE_TLDRAW_LICENSE_KEY` with your valid tldraw license key.
-7. Deploy or redeploy.
+5. Deploy or redeploy.
+6. To enable collaboration, deploy a tldraw sync server separately.
+7. Open `Settings` -> `Environment Variables`.
+8. Add `VITE_TLDRAW_SYNC_URL` with the sync server base URL.
+9. Redeploy the frontend.
 
 #### CLI Flow
 
@@ -178,17 +183,23 @@ For a production deployment:
 vercel --prod
 ```
 
-### Why A Blank Screen Can Happen On Vercel
+### Collaboration On Vercel
 
-If the app works locally but turns blank on a public Vercel URL a few seconds after loading, the most likely cause is a missing tldraw production license key.
-
-This repo now reads the key from:
+Vercel is a good fit for this Vite frontend, but it should not be used as the tldraw sync
+server for this project. Deploy the sync server separately, then point the frontend to it:
 
 ```bash
-VITE_TLDRAW_LICENSE_KEY
+VITE_TLDRAW_SYNC_URL=https://your-sync-server.example.com
 ```
 
-If that value is missing on a production-style host, the app will show a setup screen instead of trying to boot tldraw without a key.
+For local development, the frontend falls back to:
+
+```bash
+http://localhost:8787
+```
+
+That local fallback is intentionally disabled in production so a Vercel deployment does not try
+to connect to `localhost` in the user's browser.
 
 ## Reuse And Forking
 
@@ -208,7 +219,8 @@ It does not replace the separate license terms of third-party dependencies.
 
 In particular, this project depends on `tldraw`.
 If you deploy this app in production, your use is also subject to the `tldraw SDK License`.
-For commercial production use, you should expect to need a commercial tldraw license key.
+For this `tldraw` 3.x branch, keep the `Made with tldraw` watermark unless your tldraw license
+allows removing it.
 
 ## License
 
