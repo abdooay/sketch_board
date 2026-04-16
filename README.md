@@ -71,6 +71,59 @@ npm run dev
 
 The app will usually be available at `http://localhost:5173`.
 
+### Local Agent Control With MCP
+
+This branch includes a local MCP server that can control the running Sketch Board app directly.
+That is separate from the older standalone `tldraw()` widget setup in your shell config.
+
+1. Create your local env file:
+
+```bash
+cp .env.example .env.local
+```
+
+2. Start the app:
+
+```bash
+npm run dev
+```
+
+3. In another terminal, start the MCP bridge:
+
+```bash
+npm run mcp
+```
+
+The browser app connects to `VITE_TLDRAW_AGENT_WS_URL`, which defaults to `ws://localhost:4010`
+in `.env.example`. The MCP server listens on the same port through `SKETCH_BOARD_AGENT_WS_PORT`
+if you need to override it.
+
+For a deployed frontend such as Vercel, you do not need to hardcode a production bridge URL.
+You can opt in from your own browser session with a query parameter:
+
+```text
+https://your-app.example.com/?agent_ws=ws://localhost:4010
+```
+
+That lets the deployed app connect back to your local MCP bridge without affecting other users.
+
+Once the app is open in your browser, the MCP server exposes tools for:
+
+- listing open Sketch Board sessions
+- reading the current canvas snapshot
+- creating built-in tldraw shapes
+- creating Sketch Board custom shapes such as `database` and `svg-symbol`
+- updating, deleting, grouping, ungrouping, and connecting shapes
+- exporting the canvas as `svg`, `png`, or `json`
+- listing the custom shape library items available in the current browser session
+
+Recommended agent flow:
+
+1. Call `list_sketch_board_sessions`.
+2. If more than one session is open, pass `sessionId` explicitly.
+3. Call `get_snapshot` before making edits.
+4. Use `list_custom_shape_library_items` before creating `svg-symbol` shapes.
+
 ### Production Build
 
 ```bash

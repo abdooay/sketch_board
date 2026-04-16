@@ -9,6 +9,7 @@ import {
 import { useSync } from '@tldraw/sync'
 import 'tldraw/tldraw.css'
 import './index.css'
+import { createCanvasAutomationClient, type CanvasAutomationClient } from './tldraw/automation/client'
 import { CustomShapeLibraryProvider } from './tldraw/custom-shape-library'
 import { shapeUtils, syncBindingUtils, syncShapeUtils, tools } from './tldraw/config'
 import { uiOverrides } from './tldraw/overrides'
@@ -168,6 +169,7 @@ function CollaborativeCanvas({
 
 function App() {
 	const editorRef = useRef<Editor | null>(null)
+	const automationRef = useRef<CanvasAutomationClient | null>(null)
 	const canUseSyncServer = Boolean(getSyncServerBaseUrl())
 	const [roomId, setRoomId] = useState<string | null>(() =>
 		canUseSyncServer ? getRoomIdFromUrl() : null
@@ -194,8 +196,14 @@ function App() {
 
 	const handleEditorMount = useCallback(
 		(editor: Editor) => {
+			automationRef.current?.dispose()
 			editorRef.current = editor
 			editor.user.updateUserPreferences({ colorScheme: 'dark' })
+			automationRef.current = createCanvasAutomationClient(editor, () => ({
+				roomId,
+				isCollaborating: Boolean(roomId),
+				pageUrl: window.location.href,
+			}))
 
 			if (!roomId) return
 
@@ -212,6 +220,12 @@ function App() {
 		},
 		[roomId]
 	)
+
+	useEffect(() => {
+		return () => {
+			automationRef.current?.dispose()
+		}
+	}, [])
 
 	const startSharing = useCallback(() => {
 		if (!canUseSyncServer) {
