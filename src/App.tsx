@@ -10,7 +10,7 @@ import { useSync } from '@tldraw/sync'
 import 'tldraw/tldraw.css'
 import './index.css'
 import { CustomShapeLibraryProvider } from './tldraw/custom-shape-library'
-import { shapeUtils, tools } from './tldraw/config'
+import { shapeUtils, syncBindingUtils, syncShapeUtils, tools } from './tldraw/config'
 import { uiOverrides } from './tldraw/overrides'
 import { CollaborationProvider, CollaborationSharePanel } from './tldraw/share-session'
 import { CustomStylePanel } from './tldraw/style-panel'
@@ -64,8 +64,12 @@ function updateRoomUrl(roomId: string | null) {
 
 async function copyText(text: string) {
 	if (navigator.clipboard?.writeText) {
-		await navigator.clipboard.writeText(text)
-		return
+		try {
+			await navigator.clipboard.writeText(text)
+			return
+		} catch {
+			// Browser clipboard permissions vary, especially in embedded previews.
+		}
 	}
 
 	window.prompt('Copy this collaboration link', text)
@@ -145,7 +149,8 @@ function CollaborativeCanvas({
 	const store = useSync({
 		uri: getSyncServerUri(roomId),
 		assets: inlineBase64AssetStore,
-		shapeUtils,
+		shapeUtils: syncShapeUtils,
+		bindingUtils: syncBindingUtils,
 	})
 
 	return (
