@@ -15,6 +15,8 @@ export interface CanvasAutomationMetadata {
 	roomId: string | null
 	isCollaborating: boolean
 	pageUrl: string
+	projectId: string
+	projectName: string
 }
 
 export interface CanvasAutomationClient {
@@ -71,6 +73,8 @@ export function createCanvasAutomationClient(
 				sessionId,
 				pageUrl: metadata.pageUrl,
 				roomId: metadata.roomId,
+				projectId: metadata.projectId,
+				projectName: metadata.projectName,
 				isCollaborating: metadata.isCollaborating,
 				connectedAt: new Date().toISOString(),
 				supportedCustomShapeTypes: [...customShapeTypes],

@@ -13,13 +13,11 @@ import { createCanvasAutomationClient, type CanvasAutomationClient } from './tld
 import { CustomShapeLibraryProvider } from './tldraw/custom-shape-library'
 import { shapeUtils, syncBindingUtils, syncShapeUtils, tools } from './tldraw/config'
 import { uiOverrides } from './tldraw/overrides'
+import { ProjectStateProvider, useProjectState } from './tldraw/project-state'
 import { CollaborationProvider, CollaborationSharePanel } from './tldraw/share-session'
 import { CustomStylePanel } from './tldraw/style-panel'
 import { CustomToolbar } from './tldraw/toolbar'
-// tldraw 3.x cannot read the persisted store produced by the 4.x branch.
-// Keep this branch on its own storage namespace so older saved data doesn't
-// crash the app during startup migration.
-const persistenceKey = 'sketch-board-document-v3'
+
 const ROOM_PARAM = 'room'
 const ROOM_PREFIX = 'sketch-board'
 const ROOM_SNAPSHOT_PREFIX = 'sketch-board-room-seed'
@@ -126,10 +124,18 @@ function isBlankRoom(editor: Editor) {
 	return editor.getPages().length === 1 && editor.getCurrentPageShapeIds().size === 0
 }
 
-function LocalCanvas({ onMount }: { onMount: (editor: Editor) => void }) {
+function LocalCanvas({
+	projectId,
+	persistenceKey,
+	onMount,
+}: {
+	projectId: string
+	persistenceKey: string
+	onMount: (editor: Editor) => void
+}) {
 	return (
 		<Tldraw
-			key="local"
+			key={`project:${projectId}`}
 			shapeUtils={shapeUtils}
 			tools={tools}
 			persistenceKey={persistenceKey}
@@ -167,7 +173,8 @@ function CollaborativeCanvas({
 	)
 }
 
-function App() {
+function SketchBoardApp() {
+	const { activeProject } = useProjectState()
 	const editorRef = useRef<Editor | null>(null)
 	const automationRef = useRef<CanvasAutomationClient | null>(null)
 	const canUseSyncServer = Boolean(getSyncServerBaseUrl())
@@ -203,6 +210,8 @@ function App() {
 				roomId,
 				isCollaborating: Boolean(roomId),
 				pageUrl: window.location.href,
+				projectId: activeProject.id,
+				projectName: activeProject.name,
 			}))
 
 			if (!roomId) return
@@ -218,7 +227,7 @@ function App() {
 				clearStoredRoomSnapshot(roomId)
 			})
 		},
-		[roomId]
+		[activeProject.id, activeProject.name, roomId]
 	)
 
 	useEffect(() => {
@@ -272,11 +281,23 @@ function App() {
 					{roomId ? (
 						<CollaborativeCanvas roomId={roomId} onMount={handleEditorMount} />
 					) : (
-						<LocalCanvas onMount={handleEditorMount} />
+						<LocalCanvas
+							projectId={activeProject.id}
+							persistenceKey={activeProject.persistenceKey}
+							onMount={handleEditorMount}
+						/>
 					)}
 				</CustomShapeLibraryProvider>
 			</CollaborationProvider>
 		</div>
+	)
+}
+
+function App() {
+	return (
+		<ProjectStateProvider>
+			<SketchBoardApp />
+		</ProjectStateProvider>
 	)
 }
 

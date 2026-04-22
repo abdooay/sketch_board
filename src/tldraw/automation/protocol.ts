@@ -58,6 +58,8 @@ export interface CanvasSessionSummary {
 	sessionId: string
 	pageUrl: string
 	roomId: string | null
+	projectId: string
+	projectName: string
 	isCollaborating: boolean
 	connectedAt: string
 	supportedCustomShapeTypes: CustomShapeType[]
@@ -276,7 +278,11 @@ export function isRegisterCanvasMessage(value: unknown): value is RegisterCanvas
 	if (!isRecord(value)) return false
 	if (value.type !== 'register_canvas') return false
 	if (!isRecord(value.session)) return false
-	return typeof value.session.sessionId === 'string'
+	return (
+		typeof value.session.sessionId === 'string' &&
+		typeof value.session.projectId === 'string' &&
+		typeof value.session.projectName === 'string'
+	)
 }
 
 export function isCanvasCommand(value: unknown): value is CanvasCommand {
