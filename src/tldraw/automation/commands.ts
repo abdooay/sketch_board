@@ -6,6 +6,7 @@ import {
 } from 'tldraw'
 import type { TLShape, TLShapeId } from 'tldraw'
 import { getIndices } from '@tldraw/utils'
+import { defaultColorNames } from '@tldraw/tlschema'
 import {
 	DEFAULT_DATABASE_LIBRARY_ITEM_ID,
 	type CustomShapeLibraryItem,
@@ -34,9 +35,34 @@ const TL_COLOR_ALIASES: Record<string, string> = Object.freeze({
 	'gray': 'grey',
 	'light-gray': 'grey',
 	'light-grey': 'grey',
+	'slate': 'grey',
+	'stone': 'grey',
+	'neutral': 'grey',
+	'zinc': 'grey',
+	'silver': 'grey',
 	'purple': 'violet',
 	'light-purple': 'light-violet',
+	'indigo': 'violet',
+	'light-indigo': 'light-violet',
+	'amber': 'orange',
+	'gold': 'orange',
+	'brown': 'orange',
+	'tan': 'orange',
+	'teal': 'green',
+	'emerald': 'green',
+	'lime': 'light-green',
+	'mint': 'light-green',
+	'olive': 'green',
+	'cyan': 'light-blue',
+	'sky': 'light-blue',
+	'azure': 'light-blue',
+	'pink': 'light-red',
+	'rose': 'light-red',
+	'crimson': 'red',
+	'scarlet': 'red',
 })
+
+const TL_ALLOWED_COLORS = new Set<string>(defaultColorNames)
 
 export async function handleCanvasCommand(editor: Editor, cmd: CanvasCommand): Promise<CanvasResponse> {
 	const base = {
@@ -268,7 +294,20 @@ function normalizeLegacyArrowProps(props: Record<string, unknown>) {
 
 function normalizeTldrawColor(value: string) {
 	const normalized = value.trim().toLowerCase()
-	return TL_COLOR_ALIASES[normalized] ?? normalized
+	const mapped = TL_COLOR_ALIASES[normalized] ?? normalized
+	return TL_ALLOWED_COLORS.has(mapped) ? mapped : inferTldrawColor(mapped)
+}
+
+function inferTldrawColor(value: string) {
+	if (value.includes('grey') || value.includes('gray') || value.includes('slate')) return 'grey'
+	if (value.includes('violet') || value.includes('purple') || value.includes('indigo')) return 'violet'
+	if (value.includes('blue') || value.includes('cyan') || value.includes('sky')) return 'blue'
+	if (value.includes('green') || value.includes('lime') || value.includes('mint') || value.includes('teal')) return 'green'
+	if (value.includes('yellow')) return 'yellow'
+	if (value.includes('orange') || value.includes('amber') || value.includes('gold') || value.includes('brown')) return 'orange'
+	if (value.includes('red') || value.includes('pink') || value.includes('rose')) return 'red'
+	if (value.includes('white')) return 'white'
+	return 'black'
 }
 
 function normalizeLineProps(props: Record<string, unknown>) {
