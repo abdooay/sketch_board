@@ -1,14 +1,9 @@
-import { ArrowShapeUtil, defaultBindingUtils, defaultShapeUtils } from 'tldraw'
+import { defaultBindingUtils, defaultShapeUtils } from 'tldraw'
 import { DatabaseShapeUtil } from './shapes/DatabaseShape'
+import { SketchBoardArrowShapeUtil } from './shapes/SketchBoardArrowShape'
 import { SvgSymbolShapeUtil } from './shapes/SvgSymbolShape'
 import { DatabaseTool } from './tools/DatabaseTool'
 import { SvgSymbolTool } from './tools/SvgSymbolTool'
-
-const SketchBoardArrowShapeUtil = ArrowShapeUtil.configure({
-	elbowMidpointSnapDistance: 0,
-	elbowMinSegmentLengthToShowMidpointHandle: 8,
-	minElbowHandleDistance: 28,
-})
 
 export const shapeUtils = [SketchBoardArrowShapeUtil, DatabaseShapeUtil, SvgSymbolShapeUtil] as const
 export const syncShapeUtils = [
