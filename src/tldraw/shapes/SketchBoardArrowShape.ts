@@ -1,13 +1,21 @@
 import {
 	ArrowShapeUtil,
+	Group2d,
+	Polyline2d,
+	SVGContainer,
+	STROKE_SIZES,
+	Vec,
 	getArrowInfo,
+	useDefaultColorTheme,
 	type TLArrowShape,
 	type TLHandle,
 	type TLHandleDragInfo,
 } from 'tldraw'
 import { getIndices } from '@tldraw/utils'
+import React from 'react'
 
 const ELBOW_SEGMENT_HANDLE_PREFIX = 'sketch-board-elbow-segment:'
+const MANUAL_ELBOW_ROUTE_META_KEY = 'sketchBoardManualElbowRoute'
 const MIN_SEGMENT_HANDLE_DISTANCE = 8
 
 const ConfiguredArrowShapeUtil = ArrowShapeUtil.configure({
@@ -17,7 +25,19 @@ const ConfiguredArrowShapeUtil = ArrowShapeUtil.configure({
 })
 
 export class SketchBoardArrowShapeUtil extends ConfiguredArrowShapeUtil {
+	override getGeometry(shape: TLArrowShape) {
+		const manualRoute = getManualElbowRoute(shape)
+		if (!manualRoute) return super.getGeometry(shape)
+
+		return new Group2d({
+			children: [new Polyline2d({ points: manualRoute.points.map(Vec.From) })],
+		})
+	}
+
 	override getHandles(shape: TLArrowShape) {
+		const manualRoute = getManualElbowRoute(shape)
+		if (manualRoute) return getManualElbowHandles(manualRoute.points)
+
 		const handles = super.getHandles(shape)
 		if (shape.props.kind !== 'elbow') return handles
 
@@ -29,6 +49,9 @@ export class SketchBoardArrowShapeUtil extends ConfiguredArrowShapeUtil {
 	}
 
 	override onHandleDrag(shape: TLArrowShape, info: TLHandleDragInfo<TLArrowShape>) {
+		const manualRoute = getManualElbowRoute(shape)
+		if (manualRoute) return this.onManualElbowHandleDrag(shape, info, manualRoute)
+
 		const segmentIndex = getElbowSegmentHandleIndex(info.handle.id)
 		if (segmentIndex === null) return super.onHandleDrag(shape, info)
 
@@ -39,20 +62,74 @@ export class SketchBoardArrowShapeUtil extends ConfiguredArrowShapeUtil {
 		const segmentEnd = arrowInfo.route.points[segmentIndex + 1]
 		if (!segmentStart || !segmentEnd) return
 
-		const isVertical = Math.abs(segmentStart.x - segmentEnd.x) < 0.01
-		const axis = isVertical ? 'x' : 'y'
-		const axisValues = arrowInfo.route.points.map((point) => point[axis])
-		const lo = Math.min(...axisValues)
-		const hi = Math.max(...axisValues)
+		const points = arrowInfo.route.points.map((point) => ({ x: point.x, y: point.y }))
+		moveElbowSegment(points, segmentIndex, info.handle)
 
-		if (Math.abs(hi - lo) < 0.01) return
-
-		const elbowMidPoint = clamp01((info.handle[axis] - lo) / (hi - lo))
 		return {
 			id: shape.id,
 			type: shape.type,
+			meta: {
+				...shape.meta,
+				[MANUAL_ELBOW_ROUTE_META_KEY]: {
+					version: 1,
+					points,
+				},
+			},
 			props: {
-				elbowMidPoint,
+				start: points[0],
+				end: points[points.length - 1],
+			},
+		}
+	}
+
+	override component(shape: TLArrowShape) {
+		const manualRoute = getManualElbowRoute(shape)
+		if (!manualRoute) return super.component(shape)
+
+		return React.createElement(ManualElbowArrowSvg, { shape, points: manualRoute.points })
+	}
+
+	override indicator(shape: TLArrowShape) {
+		const manualRoute = getManualElbowRoute(shape)
+		if (!manualRoute) return super.indicator(shape)
+
+		return React.createElement('path', {
+			d: getManualElbowPath(manualRoute.points),
+			fill: 'none',
+		})
+	}
+
+	private onManualElbowHandleDrag(
+		shape: TLArrowShape,
+		info: TLHandleDragInfo<TLArrowShape>,
+		route: ManualElbowRoute
+	) {
+		const points = route.points.map((point) => ({ ...point }))
+		const segmentIndex = getElbowSegmentHandleIndex(info.handle.id)
+
+		if (info.handle.id === 'start') {
+			points[0] = { x: info.handle.x, y: info.handle.y }
+		} else if (info.handle.id === 'end') {
+			points[points.length - 1] = { x: info.handle.x, y: info.handle.y }
+		} else if (segmentIndex !== null) {
+			moveElbowSegment(points, segmentIndex, info.handle)
+		} else {
+			return
+		}
+
+		return {
+			id: shape.id,
+			type: shape.type,
+			meta: {
+				...shape.meta,
+				[MANUAL_ELBOW_ROUTE_META_KEY]: {
+					version: 1,
+					points,
+				},
+			},
+			props: {
+				start: points[0],
+				end: points[points.length - 1],
 			},
 		}
 	}
@@ -89,6 +166,33 @@ function getElbowSegmentHandles(points: { x: number; y: number }[], existingHand
 	return handles
 }
 
+function getManualElbowHandles(points: { x: number; y: number }[]) {
+	if (points.length < 2) return []
+
+	const indices = getIndices(points.length + 2)
+	const handles: TLHandle[] = [
+		{
+			id: 'start',
+			type: 'vertex',
+			index: indices[0],
+			x: points[0].x,
+			y: points[0].y,
+			canSnap: true,
+		},
+		{
+			id: 'end',
+			type: 'vertex',
+			index: indices[indices.length - 1],
+			x: points[points.length - 1].x,
+			y: points[points.length - 1].y,
+			canSnap: true,
+		},
+	]
+
+	handles.push(...getElbowSegmentHandles(points, handles))
+	return handles
+}
+
 function isNearExistingHandle(point: { x: number; y: number }, handles: TLHandle[]) {
 	return handles.some((handle) => Math.hypot(handle.x - point.x, handle.y - point.y) < 0.5)
 }
@@ -99,6 +203,120 @@ function getElbowSegmentHandleIndex(handleId: string) {
 	return Number.isInteger(rawIndex) && rawIndex >= 0 ? rawIndex : null
 }
 
-function clamp01(value: number) {
-	return Math.max(0, Math.min(1, value))
+function moveElbowSegment(
+	points: { x: number; y: number }[],
+	segmentIndex: number,
+	handle: { x: number; y: number }
+) {
+	const start = points[segmentIndex]
+	const end = points[segmentIndex + 1]
+	if (!start || !end) return
+
+	const isVertical = Math.abs(start.x - end.x) < Math.abs(start.y - end.y)
+	if (isVertical) {
+		start.x = handle.x
+		end.x = handle.x
+	} else {
+		start.y = handle.y
+		end.y = handle.y
+	}
+}
+
+type ManualElbowRoute = {
+	version: 1
+	points: { x: number; y: number }[]
+}
+
+function getManualElbowRoute(shape: TLArrowShape): ManualElbowRoute | null {
+	const value = shape.meta[MANUAL_ELBOW_ROUTE_META_KEY]
+	if (!isManualElbowRoute(value)) return null
+	if (value.points.length < 2) return null
+	return value
+}
+
+function isManualElbowRoute(value: unknown): value is ManualElbowRoute {
+	if (!value || typeof value !== 'object') return false
+
+	const candidate = value as { version?: unknown; points?: unknown }
+	return (
+		candidate.version === 1 &&
+		Array.isArray(candidate.points) &&
+		candidate.points.every(
+			(point) =>
+				point &&
+				typeof point === 'object' &&
+				typeof (point as { x?: unknown }).x === 'number' &&
+				typeof (point as { y?: unknown }).y === 'number'
+		)
+	)
+}
+
+function ManualElbowArrowSvg({
+	shape,
+	points,
+}: {
+	shape: TLArrowShape
+	points: { x: number; y: number }[]
+}) {
+	const theme = useDefaultColorTheme()
+	const strokeWidth = STROKE_SIZES[shape.props.size] * shape.props.scale
+	const stroke = theme[shape.props.color].solid
+	const path = getManualElbowPath(points)
+
+	return React.createElement(
+		SVGContainer,
+		{ style: { minWidth: 50, minHeight: 50 } },
+		React.createElement(
+			'g',
+			{
+				fill: 'none',
+				stroke,
+				strokeWidth,
+				strokeLinejoin: 'round',
+				strokeLinecap: 'round',
+				pointerEvents: 'none',
+			},
+			React.createElement('path', { d: path }),
+			shape.props.arrowheadStart !== 'none' &&
+				React.createElement('path', {
+					d: getManualArrowheadPath(points, 'start', strokeWidth),
+					fill: stroke,
+				}),
+			shape.props.arrowheadEnd !== 'none' &&
+				React.createElement('path', {
+					d: getManualArrowheadPath(points, 'end', strokeWidth),
+					fill: stroke,
+				})
+		)
+	)
+}
+
+function getManualElbowPath(points: { x: number; y: number }[]) {
+	return points
+		.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+		.join(' ')
+}
+
+function getManualArrowheadPath(
+	points: { x: number; y: number }[],
+	terminal: 'start' | 'end',
+	strokeWidth: number
+) {
+	const tip = terminal === 'start' ? points[0] : points[points.length - 1]
+	const adjacent = terminal === 'start' ? points[1] : points[points.length - 2]
+	if (!tip || !adjacent) return ''
+
+	const angle = Math.atan2(tip.y - adjacent.y, tip.x - adjacent.x)
+	const length = Math.max(10, strokeWidth * 4)
+	const spread = Math.PI / 7
+	const left = {
+		x: tip.x - Math.cos(angle - spread) * length,
+		y: tip.y - Math.sin(angle - spread) * length,
+	}
+	const right = {
+		x: tip.x - Math.cos(angle + spread) * length,
+		y: tip.y - Math.sin(angle + spread) * length,
+	}
+
+	return `M ${tip.x} ${tip.y} L ${left.x} ${left.y} L ${right.x} ${right.y} Z`
 }
