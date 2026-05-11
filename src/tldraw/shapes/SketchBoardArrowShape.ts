@@ -83,15 +83,17 @@ export class SketchBoardArrowShapeUtil extends ConfiguredArrowShapeUtil {
 	}
 
 	override component(shape: TLArrowShape) {
+		const defaultComponent = super.component(shape)
 		const manualRoute = getManualElbowRoute(shape)
-		if (!manualRoute) return super.component(shape)
+		if (!manualRoute) return defaultComponent
 
 		return React.createElement(ManualElbowArrowSvg, { shape, points: manualRoute.points })
 	}
 
 	override indicator(shape: TLArrowShape) {
+		const defaultIndicator = super.indicator(shape)
 		const manualRoute = getManualElbowRoute(shape)
-		if (!manualRoute) return super.indicator(shape)
+		if (!manualRoute) return defaultIndicator
 
 		return React.createElement('path', {
 			d: getManualElbowPath(manualRoute.points),
