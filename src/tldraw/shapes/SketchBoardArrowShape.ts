@@ -28,15 +28,16 @@ export class SketchBoardArrowShapeUtil extends ConfiguredArrowShapeUtil {
 	override getGeometry(shape: TLArrowShape) {
 		const manualRoute = getManualElbowRoute(shape)
 		if (!manualRoute) return super.getGeometry(shape)
+		const points = this.getEffectiveManualElbowPoints(shape, manualRoute)
 
 		return new Group2d({
-			children: [new Polyline2d({ points: manualRoute.points.map(Vec.From) })],
+			children: [new Polyline2d({ points: points.map(Vec.From) })],
 		})
 	}
 
 	override getHandles(shape: TLArrowShape) {
 		const manualRoute = getManualElbowRoute(shape)
-		if (manualRoute) return getManualElbowHandles(manualRoute.points)
+		if (manualRoute) return getManualElbowHandles(this.getEffectiveManualElbowPoints(shape, manualRoute))
 
 		const handles = super.getHandles(shape)
 		if (shape.props.kind !== 'elbow') return handles
@@ -86,17 +87,19 @@ export class SketchBoardArrowShapeUtil extends ConfiguredArrowShapeUtil {
 		const defaultComponent = super.component(shape)
 		const manualRoute = getManualElbowRoute(shape)
 		if (!manualRoute) return defaultComponent
+		const points = this.getEffectiveManualElbowPoints(shape, manualRoute)
 
-		return React.createElement(ManualElbowArrowSvg, { shape, points: manualRoute.points })
+		return React.createElement(ManualElbowArrowSvg, { shape, points })
 	}
 
 	override indicator(shape: TLArrowShape) {
 		const defaultIndicator = super.indicator(shape)
 		const manualRoute = getManualElbowRoute(shape)
 		if (!manualRoute) return defaultIndicator
+		const points = this.getEffectiveManualElbowPoints(shape, manualRoute)
 
 		return React.createElement('path', {
-			d: getManualElbowPath(manualRoute.points),
+			d: getManualElbowPath(points),
 			fill: 'none',
 		})
 	}
@@ -106,7 +109,7 @@ export class SketchBoardArrowShapeUtil extends ConfiguredArrowShapeUtil {
 		info: TLHandleDragInfo<TLArrowShape>,
 		route: ManualElbowRoute
 	) {
-		const points = route.points.map((point) => ({ ...point }))
+		const points = this.getEffectiveManualElbowPoints(shape, route)
 		const segmentIndex = getElbowSegmentHandleIndex(info.handle.id)
 
 		if (info.handle.id === 'start') {
@@ -134,6 +137,16 @@ export class SketchBoardArrowShapeUtil extends ConfiguredArrowShapeUtil {
 				end: points[points.length - 1],
 			},
 		}
+	}
+
+	private getEffectiveManualElbowPoints(shape: TLArrowShape, route: ManualElbowRoute) {
+		const points = route.points.map((point) => ({ ...point }))
+		const info = getArrowInfo(this.editor, shape)
+		if (!info) return points
+
+		syncManualEndpoint(points, 'start', info.start.point)
+		syncManualEndpoint(points, 'end', info.end.point)
+		return points
 	}
 }
 
@@ -221,6 +234,29 @@ function moveElbowSegment(
 	} else {
 		start.y = handle.y
 		end.y = handle.y
+	}
+}
+
+function syncManualEndpoint(
+	points: { x: number; y: number }[],
+	terminal: 'start' | 'end',
+	nextPoint: { x: number; y: number }
+) {
+	if (points.length < 2) return
+
+	const endpointIndex = terminal === 'start' ? 0 : points.length - 1
+	const adjacentIndex = terminal === 'start' ? 1 : points.length - 2
+	const endpoint = points[endpointIndex]
+	const adjacent = points[adjacentIndex]
+	if (!endpoint || !adjacent) return
+
+	const wasVertical = Math.abs(endpoint.x - adjacent.x) < Math.abs(endpoint.y - adjacent.y)
+	points[endpointIndex] = { x: nextPoint.x, y: nextPoint.y }
+
+	if (wasVertical) {
+		adjacent.x = nextPoint.x
+	} else {
+		adjacent.y = nextPoint.y
 	}
 }
 
