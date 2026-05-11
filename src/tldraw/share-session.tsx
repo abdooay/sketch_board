@@ -6,6 +6,7 @@ import {
 	TldrawUiPopoverContent,
 	TldrawUiPopoverTrigger,
 } from 'tldraw'
+import { Check, Cloud, CloudOff, LoaderCircle } from 'lucide-react'
 import { useProjectState } from './project-state'
 import type { CloudSaveStatus } from './cloud-storage'
 
@@ -149,16 +150,20 @@ export function CollaborationSharePanel() {
 	const projectManagementDisabled = isCollaborating
 	const projectManagementReason = 'Leave the shared session to switch or create projects.'
 	const cloudBusy = cloudStatus === 'connecting' || cloudStatus === 'saving'
-	const cloudLabel =
-		cloudStatus === 'connecting'
-			? 'Cloud...'
-			: cloudStatus === 'saving'
-				? 'Saving...'
-				: cloudStatus === 'saved'
-					? 'Cloud saved'
-					: cloudStatus === 'error'
-						? 'Cloud error'
-						: 'Sign in'
+	const cloudLabel = isCloudEnabled
+		? cloudStatus === 'saved'
+			? 'Cloud saved'
+			: cloudStatus === 'error'
+				? 'Cloud error'
+				: 'Cloud'
+		: 'Sign in'
+	const CloudIcon = cloudBusy
+		? LoaderCircle
+		: cloudStatus === 'saved'
+			? Check
+			: cloudStatus === 'error' || !isCloudEnabled
+				? CloudOff
+				: Cloud
 	const cloudButtonTitle = isCloudEnabled
 		? cloudBusy
 			? cloudDetail
@@ -274,7 +279,15 @@ export function CollaborationSharePanel() {
 					}
 				}}
 			>
-				{cloudLabel}
+				<span className="cloud-save-button__content">
+					<CloudIcon
+						size={16}
+						strokeWidth={2.25}
+						className={cloudBusy ? 'cloud-save-button__icon--spin' : undefined}
+						aria-hidden="true"
+					/>
+					{!cloudBusy && <span>{cloudLabel}</span>}
+				</span>
 			</TldrawUiButton>
 			<TldrawUiButton
 				type={isCollaborating ? 'normal' : 'primary'}

@@ -32,11 +32,29 @@ body {
 }
 
 .app-share-panel__button--cloud {
-	min-width: 116px;
+	min-width: 40px;
 }
 
 .app-share-panel__button--project {
 	max-width: 220px;
+}
+
+.cloud-save-button__content {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	min-width: 16px;
+}
+
+.cloud-save-button__icon--spin {
+	animation: cloud-save-spin 0.9s linear infinite;
+}
+
+@keyframes cloud-save-spin {
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 .project-menu {
