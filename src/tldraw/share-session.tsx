@@ -150,13 +150,7 @@ export function CollaborationSharePanel() {
 	const projectManagementDisabled = isCollaborating
 	const projectManagementReason = 'Leave the shared session to switch or create projects.'
 	const cloudBusy = cloudStatus === 'connecting' || cloudStatus === 'saving'
-	const cloudLabel = isCloudEnabled
-		? cloudStatus === 'saved'
-			? 'Cloud saved'
-			: cloudStatus === 'error'
-				? 'Cloud error'
-				: 'Cloud'
-		: 'Sign in'
+	const cloudLabel = 'Sign in'
 	const CloudIcon = cloudBusy
 		? LoaderCircle
 		: cloudStatus === 'saved'
@@ -286,7 +280,7 @@ export function CollaborationSharePanel() {
 						className={cloudBusy ? 'cloud-save-button__icon--spin' : undefined}
 						aria-hidden="true"
 					/>
-					{!cloudBusy && <span>{cloudLabel}</span>}
+					{!isCloudEnabled && <span>{cloudLabel}</span>}
 				</span>
 			</TldrawUiButton>
 			<TldrawUiButton
