@@ -27,6 +27,7 @@ import {
 	isSvgFile,
 	sanitizeSvgMarkup,
 } from './svg-import'
+import type { StoredCustomShapeLibraryState } from './cloud-storage'
 
 const CUSTOM_SHAPE_LIBRARY_STORAGE_KEY = 'sketch-board-custom-shape-library'
 const CUSTOM_SHAPE_LIBRARY_ACTIVE_ITEM_STORAGE_KEY = 'sketch-board-custom-shape-library-active-item'
@@ -53,6 +54,7 @@ interface CustomShapeLibraryContextValue {
 	): Promise<ImportCustomShapeLibraryResult>
 	renameItem(id: string, label: string): void
 	deleteItem(id: string): void
+	replaceLibraryState(state: StoredCustomShapeLibraryState): void
 	getItem(id: string | null | undefined): CustomShapeLibraryItem | null
 	getActiveItemForType(type: CustomShapeType): CustomShapeLibraryItem | null
 }
@@ -286,6 +288,16 @@ export function CustomShapeLibraryProvider({ children }: { children: ReactNode }
 		[items]
 	)
 
+	const replaceLibraryState = useCallback((nextState: StoredCustomShapeLibraryState) => {
+		const nextItems = normalizeStoredCustomShapeLibraryItems(nextState.items)
+		setItems(nextItems)
+		setActiveItemId(
+			nextState.activeItemId && nextItems.some((item) => item.id === nextState.activeItemId)
+				? nextState.activeItemId
+				: (nextItems[0]?.id ?? null)
+		)
+	}, [])
+
 	const getItem = useCallback(
 		(id: string | null | undefined) => {
 			if (!id) return null
@@ -315,6 +327,7 @@ export function CustomShapeLibraryProvider({ children }: { children: ReactNode }
 			importItemsFromTextInputs,
 			renameItem,
 			deleteItem,
+			replaceLibraryState,
 			getItem,
 			getActiveItemForType,
 		}),
@@ -327,6 +340,7 @@ export function CustomShapeLibraryProvider({ children }: { children: ReactNode }
 			importItemsFromTextInputs,
 			renameItem,
 			deleteItem,
+			replaceLibraryState,
 			getItem,
 			getActiveItemForType,
 		]

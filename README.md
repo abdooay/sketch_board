@@ -11,6 +11,7 @@ The project is intended to be reusable. You can fork it, adapt it, and use it as
 - Built-in `database` custom shape
 - Generic `svg-symbol` custom shape for imported SVG icons and symbols
 - Custom shape library persisted in browser storage
+- Optional Google account cloud autosave backed by private Vercel Blob storage
 - Import custom shapes from:
   - local `.svg` files
   - local `.json` library files
@@ -18,6 +19,7 @@ The project is intended to be reusable. You can fork it, adapt it, and use it as
   - clipboard paste of raw SVG or copied web content containing SVG
 - Theme-aware SVG contrast adjustment for monochrome icons
 - Canvas persistence across page refreshes via `tldraw` local persistence
+- Cloud save can copy existing browser-local projects into the signed-in Google account
 - Optional live collaboration through a separately deployed tldraw sync server
 
 ## Stack
@@ -62,6 +64,7 @@ cp .env.example .env.local
 ```
 
 `VITE_TLDRAW_SYNC_URL` is optional. Leave it empty unless you have a running tldraw sync server.
+Cloud save is optional locally unless the Vercel Blob and Google OAuth environment variables are configured.
 
 ### Start The Dev Server
 
@@ -136,6 +139,36 @@ npm run build
 npm run preview
 ```
 
+## Cloud Save
+
+Cloud save uses Google OAuth for account ownership and Vercel Blob private storage for the document.
+The browser never chooses the cloud document path. The server derives it from the signed-in Google
+account id, so each Google account gets its own private cloud document.
+
+Required environment variables:
+
+- `BLOB_READ_WRITE_TOKEN`: created by linking a private Vercel Blob store to the project
+- `GOOGLE_CLIENT_ID`: from a Google OAuth web client
+- `GOOGLE_CLIENT_SECRET`: from the same Google OAuth web client
+- `AUTH_COOKIE_SECRET`: a long random value used to sign the session cookie
+
+Google OAuth redirect URI:
+
+```text
+https://your-app.example.com/api/auth/callback
+```
+
+When a user signs in for the first time, Sketch Board reads the existing browser-local tldraw
+projects and custom shape library and uploads them to that Google account's cloud document. Local
+browser autosave stays enabled, so existing browser data is not deleted by enabling cloud save.
+
+For local testing of cloud save, run the app through Vercel's dev server so the `/api/*` functions
+are available:
+
+```bash
+npx vercel dev
+```
+
 ### Lint
 
 ```bash
@@ -204,6 +237,13 @@ Recommended Vercel settings:
 Optional environment variable:
 
 - `VITE_TLDRAW_SYNC_URL`: base URL for your external tldraw sync server, for example `https://sketch-board-sync.example.com`
+
+Cloud save environment variables:
+
+- `BLOB_READ_WRITE_TOKEN`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `AUTH_COOKIE_SECRET`
 
 Vercel should host the frontend only. The live collaboration feature uses WebSockets, so the
 tldraw sync server must run on a platform that supports persistent WebSocket connections.

@@ -7,6 +7,7 @@ import {
 	TldrawUiPopoverTrigger,
 } from 'tldraw'
 import { useProjectState } from './project-state'
+import type { CloudSaveStatus } from './cloud-storage'
 
 type CollaborationContextValue = {
 	roomId: string | null
@@ -16,6 +17,11 @@ type CollaborationContextValue = {
 	copyShareLink: () => Promise<void>
 	leaveSession: () => void
 	shareLabel: string
+	cloudStatus: CloudSaveStatus
+	cloudDetail: string
+	isCloudEnabled: boolean
+	connectCloud: () => void
+	disconnectCloud: () => void
 }
 
 const CollaborationContext = createContext<CollaborationContextValue | null>(null)
@@ -34,6 +40,11 @@ export function CollaborationProvider({
 	copyShareLink,
 	leaveSession,
 	canShare,
+	cloudStatus,
+	cloudDetail,
+	isCloudEnabled,
+	connectCloud,
+	disconnectCloud,
 	children,
 }: {
 	roomId: string | null
@@ -41,6 +52,11 @@ export function CollaborationProvider({
 	copyShareLink: () => Promise<boolean>
 	leaveSession: () => void
 	canShare: boolean
+	cloudStatus: CloudSaveStatus
+	cloudDetail: string
+	isCloudEnabled: boolean
+	connectCloud: () => void
+	disconnectCloud: () => void
 	children: ReactNode
 }) {
 	const [didCopy, setDidCopy] = useState(false)
@@ -83,16 +99,44 @@ export function CollaborationProvider({
 			copyShareLink: handleCopy,
 			leaveSession,
 			shareLabel,
+			cloudStatus,
+			cloudDetail,
+			isCloudEnabled,
+			connectCloud,
+			disconnectCloud,
 		}),
-		[roomId, canShare, startSharing, handleCopy, leaveSession, shareLabel]
+		[
+			roomId,
+			canShare,
+			startSharing,
+			handleCopy,
+			leaveSession,
+			shareLabel,
+			cloudStatus,
+			cloudDetail,
+			isCloudEnabled,
+			connectCloud,
+			disconnectCloud,
+		]
 	)
 
 	return <CollaborationContext.Provider value={value}>{children}</CollaborationContext.Provider>
 }
 
 export function CollaborationSharePanel() {
-	const { isCollaborating, canShare, startSharing, copyShareLink, leaveSession, shareLabel } =
-		useCollaborationContext()
+	const {
+		isCollaborating,
+		canShare,
+		startSharing,
+		copyShareLink,
+		leaveSession,
+		shareLabel,
+		cloudStatus,
+		cloudDetail,
+		isCloudEnabled,
+		connectCloud,
+		disconnectCloud,
+	} = useCollaborationContext()
 	const {
 		projects,
 		activeProject,
@@ -104,6 +148,16 @@ export function CollaborationSharePanel() {
 	const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false)
 	const projectManagementDisabled = isCollaborating
 	const projectManagementReason = 'Leave the shared session to switch or create projects.'
+	const cloudLabel =
+		cloudStatus === 'connecting'
+			? 'Cloud...'
+			: cloudStatus === 'saving'
+				? 'Saving...'
+				: cloudStatus === 'saved'
+					? 'Cloud saved'
+					: cloudStatus === 'error'
+						? 'Cloud error'
+						: 'Sign in'
 
 	const handleSelectProject = (projectId: string) => {
 		if (projectManagementDisabled) return
@@ -200,6 +254,20 @@ export function CollaborationSharePanel() {
 					</div>
 				</TldrawUiPopoverContent>
 			</TldrawUiPopover>
+			<TldrawUiButton
+				type={isCloudEnabled ? 'normal' : 'low'}
+				className="app-share-panel__button app-share-panel__button--cloud"
+				title={cloudDetail}
+				onClick={() => {
+					if (isCloudEnabled) {
+						disconnectCloud()
+					} else {
+						connectCloud()
+					}
+				}}
+			>
+				{cloudLabel}
+			</TldrawUiButton>
 			<TldrawUiButton
 				type={isCollaborating ? 'normal' : 'primary'}
 				className="app-share-panel__button"

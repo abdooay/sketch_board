@@ -23,6 +23,7 @@ interface ProjectStateContextValue {
 	selectProject(id: string): void
 	createProject(name: string): ProjectSummary | null
 	renameProject(id: string, name: string): void
+	replaceProjectState(projects: ProjectSummary[], activeProjectId: string): void
 	getSuggestedProjectName(): string
 }
 
@@ -124,6 +125,27 @@ function normalizeStoredProjectState(): StoredProjectState {
 	}
 }
 
+function normalizeProjectState(
+	projects: ProjectSummary[],
+	activeProjectId: string
+): StoredProjectState | null {
+	if (projects.length === 0 || !projects.every(isProjectSummary)) return null
+
+	const normalizedProjects = projects.map((project) => ({
+		id: project.id.trim(),
+		name: project.name.trim(),
+		persistenceKey: project.persistenceKey.trim(),
+		createdAt: project.createdAt.trim(),
+	}))
+	const uniqueIds = new Set(normalizedProjects.map((project) => project.id))
+	if (uniqueIds.size !== normalizedProjects.length) return null
+
+	return {
+		projects: normalizedProjects,
+		activeProjectId: uniqueIds.has(activeProjectId) ? activeProjectId : normalizedProjects[0].id,
+	}
+}
+
 export function ProjectStateProvider({ children }: { children: ReactNode }) {
 	const [state, setState] = useState<StoredProjectState>(() => normalizeStoredProjectState())
 
@@ -189,6 +211,12 @@ export function ProjectStateProvider({ children }: { children: ReactNode }) {
 		}))
 	}, [])
 
+	const replaceProjectState = useCallback((projects: ProjectSummary[], activeProjectId: string) => {
+		const normalizedState = normalizeProjectState(projects, activeProjectId)
+		if (!normalizedState) return
+		setState(normalizedState)
+	}, [])
+
 	const getSuggestedProjectName = useCallback(() => {
 		const usedNames = new Set(state.projects.map((project) => project.name.trim().toLowerCase()))
 		let index = 1
@@ -207,9 +235,18 @@ export function ProjectStateProvider({ children }: { children: ReactNode }) {
 			selectProject,
 			createProject,
 			renameProject,
+			replaceProjectState,
 			getSuggestedProjectName,
 		}),
-		[activeProject, state.projects, selectProject, createProject, renameProject, getSuggestedProjectName]
+		[
+			activeProject,
+			state.projects,
+			selectProject,
+			createProject,
+			renameProject,
+			replaceProjectState,
+			getSuggestedProjectName,
+		]
 	)
 
 	return <ProjectStateContext.Provider value={value}>{children}</ProjectStateContext.Provider>

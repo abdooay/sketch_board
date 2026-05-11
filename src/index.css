@@ -31,6 +31,10 @@ body {
 	min-width: 104px;
 }
 
+.app-share-panel__button--cloud {
+	min-width: 116px;
+}
+
 .app-share-panel__button--project {
 	max-width: 220px;
 }

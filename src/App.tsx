@@ -10,7 +10,24 @@ import { useSync } from '@tldraw/sync'
 import 'tldraw/tldraw.css'
 import './index.css'
 import { createCanvasAutomationClient, type CanvasAutomationClient } from './tldraw/automation/client'
-import { CustomShapeLibraryProvider } from './tldraw/custom-shape-library'
+import {
+	CustomShapeLibraryProvider,
+	useCustomShapeLibrary,
+} from './tldraw/custom-shape-library'
+import {
+	createBrowserCloudDocument,
+	fetchCloudDocument,
+	fetchCloudSession,
+	hasCloudSnapshotForProject,
+	mergeCloudDocumentWithBrowserData,
+	saveCloudDocument,
+	signOutCloud,
+	startGoogleCloudSignIn,
+	updateCloudDocumentFromBrowserState,
+	type CloudSaveStatus,
+	type CloudUser,
+	type SketchBoardCloudDocument,
+} from './tldraw/cloud-storage'
 import { shapeUtils, syncBindingUtils, syncShapeUtils, tools } from './tldraw/config'
 import { uiOverrides } from './tldraw/overrides'
 import { ProjectStateProvider, useProjectState } from './tldraw/project-state'
@@ -174,13 +191,41 @@ function CollaborativeCanvas({
 }
 
 function SketchBoardApp() {
-	const { activeProject } = useProjectState()
+	const {
+		projects,
+		activeProject,
+		replaceProjectState,
+	} = useProjectState()
+	const customShapeLibrary = useCustomShapeLibrary()
+	const { replaceLibraryState } = customShapeLibrary
 	const editorRef = useRef<Editor | null>(null)
 	const automationRef = useRef<CanvasAutomationClient | null>(null)
+	const cloudSaveTimeoutRef = useRef<number | null>(null)
+	const cloudSaveListenerRef = useRef<(() => void) | null>(null)
+	const cloudDocumentRef = useRef<SketchBoardCloudDocument | null>(null)
+	const cloudUserRef = useRef<CloudUser | null>(null)
+	const isApplyingCloudSnapshotRef = useRef(false)
+	const isHydratingCloudRef = useRef(false)
+	const projectsRef = useRef(projects)
+	const activeProjectRef = useRef(activeProject)
+	const customShapeLibraryRef = useRef(customShapeLibrary)
 	const canUseSyncServer = Boolean(getSyncServerBaseUrl())
 	const [roomId, setRoomId] = useState<string | null>(() =>
 		canUseSyncServer ? getRoomIdFromUrl() : null
 	)
+	const [cloudUser, setCloudUser] = useState<CloudUser | null>(null)
+	const [cloudStatus, setCloudStatus] = useState<CloudSaveStatus>('connecting')
+	const [cloudDetail, setCloudDetail] = useState('Checking Google sign-in.')
+
+	useEffect(() => {
+		projectsRef.current = projects
+		activeProjectRef.current = activeProject
+		customShapeLibraryRef.current = customShapeLibrary
+	}, [projects, activeProject, customShapeLibrary])
+
+	useEffect(() => {
+		cloudUserRef.current = cloudUser
+	}, [cloudUser])
 
 	useEffect(() => {
 		const onPopState = () => {
@@ -201,9 +246,70 @@ function SketchBoardApp() {
 		}
 	}, [canUseSyncServer])
 
+	const saveCloudNow = useCallback(async () => {
+		const user = cloudUserRef.current
+		const editor = editorRef.current
+		if (!user || !editor || roomId || isHydratingCloudRef.current) return
+
+		setCloudStatus('saving')
+		setCloudDetail('Saving board to cloud.')
+
+		try {
+			const nextDocument = updateCloudDocumentFromBrowserState(cloudDocumentRef.current, {
+				projects: projectsRef.current,
+				activeProjectId: activeProjectRef.current.id,
+				activeSnapshot: getSnapshot(editor.store),
+				customShapeLibrary: {
+					items: customShapeLibraryRef.current.items,
+					activeItemId: customShapeLibraryRef.current.activeItemId,
+				},
+			})
+			await saveCloudDocument(nextDocument)
+			cloudDocumentRef.current = nextDocument
+			setCloudStatus('saved')
+			setCloudDetail(`Cloud saved to ${user.email} at ${new Date().toLocaleTimeString()}.`)
+		} catch (error) {
+			setCloudStatus('error')
+			setCloudDetail(error instanceof Error ? error.message : 'Could not save to cloud.')
+		}
+	}, [roomId])
+
+	const scheduleCloudSave = useCallback(() => {
+		if (!cloudUserRef.current || roomId || isHydratingCloudRef.current) return
+
+		if (cloudSaveTimeoutRef.current !== null) {
+			window.clearTimeout(cloudSaveTimeoutRef.current)
+		}
+
+		setCloudStatus('saving')
+		setCloudDetail('Saving board to cloud.')
+		cloudSaveTimeoutRef.current = window.setTimeout(() => {
+			cloudSaveTimeoutRef.current = null
+			void saveCloudNow()
+		}, 1800)
+	}, [roomId, saveCloudNow])
+
+	const applyCloudSnapshotToEditor = useCallback((editor: Editor, projectId: string) => {
+		const cloudDocument = cloudDocumentRef.current
+		const snapshot = cloudDocument?.projectSnapshots[projectId]
+		if (!snapshot) return
+
+		window.requestAnimationFrame(() => {
+			isApplyingCloudSnapshotRef.current = true
+			try {
+				editor.loadSnapshot(snapshot)
+			} finally {
+				window.setTimeout(() => {
+					isApplyingCloudSnapshotRef.current = false
+				}, 0)
+			}
+		})
+	}, [])
+
 	const handleEditorMount = useCallback(
 		(editor: Editor) => {
 			automationRef.current?.dispose()
+			cloudSaveListenerRef.current?.()
 			editorRef.current = editor
 			editor.user.updateUserPreferences({ colorScheme: 'dark' })
 			automationRef.current = createCanvasAutomationClient(editor, () => ({
@@ -213,6 +319,18 @@ function SketchBoardApp() {
 				projectId: activeProject.id,
 				projectName: activeProject.name,
 			}))
+
+			if (!roomId && hasCloudSnapshotForProject(cloudDocumentRef.current, activeProject.id)) {
+				applyCloudSnapshotToEditor(editor, activeProject.id)
+			}
+
+			cloudSaveListenerRef.current = editor.store.listen(
+				() => {
+					if (isApplyingCloudSnapshotRef.current) return
+					scheduleCloudSave()
+				},
+				{ source: 'user' }
+			)
 
 			if (!roomId) return
 
@@ -227,13 +345,144 @@ function SketchBoardApp() {
 				clearStoredRoomSnapshot(roomId)
 			})
 		},
-		[activeProject.id, activeProject.name, roomId]
+		[activeProject.id, activeProject.name, roomId, applyCloudSnapshotToEditor, scheduleCloudSave]
 	)
 
 	useEffect(() => {
 		return () => {
 			automationRef.current?.dispose()
+			cloudSaveListenerRef.current?.()
+			if (cloudSaveTimeoutRef.current !== null) {
+				window.clearTimeout(cloudSaveTimeoutRef.current)
+			}
 		}
+	}, [])
+
+	useEffect(() => {
+		let didCancel = false
+
+		const loadCloudSession = async () => {
+			try {
+				const user = await fetchCloudSession()
+				if (didCancel) return
+				setCloudUser(user)
+				if (!user) {
+					cloudDocumentRef.current = null
+					setCloudStatus('local')
+					setCloudDetail('Browser-only autosave is active. Sign in with Google to enable cloud save.')
+				}
+			} catch (error) {
+				if (didCancel) return
+				setCloudStatus('error')
+				setCloudDetail(error instanceof Error ? error.message : 'Could not load cloud session.')
+			}
+		}
+
+		void loadCloudSession()
+
+		return () => {
+			didCancel = true
+		}
+	}, [])
+
+	useEffect(() => {
+		if (!cloudUser) {
+			cloudDocumentRef.current = null
+			return
+		}
+
+		let didCancel = false
+		isHydratingCloudRef.current = true
+		setCloudStatus('connecting')
+		setCloudDetail('Loading cloud save.')
+
+		const hydrateCloudDocument = async () => {
+			try {
+				const activeSnapshot = editorRef.current ? getSnapshot(editorRef.current.store) : null
+				const browserDocument = await createBrowserCloudDocument({
+					projects: projectsRef.current,
+					activeProjectId: activeProjectRef.current.id,
+					activeSnapshot,
+					customShapeLibrary: {
+						items: customShapeLibraryRef.current.items,
+						activeItemId: customShapeLibraryRef.current.activeItemId,
+					},
+				})
+				const remoteDocument = await fetchCloudDocument()
+				const { document, didChange } = remoteDocument
+					? mergeCloudDocumentWithBrowserData(remoteDocument, browserDocument)
+					: { document: browserDocument, didChange: true }
+
+				if (didChange) {
+					await saveCloudDocument(document)
+				}
+
+				if (didCancel) return
+
+				cloudDocumentRef.current = document
+				replaceProjectState(document.projects, document.activeProjectId)
+				replaceLibraryState(document.customShapeLibrary)
+				const editor = editorRef.current
+				if (editor && document.activeProjectId === activeProjectRef.current.id) {
+					applyCloudSnapshotToEditor(editor, document.activeProjectId)
+				}
+				setCloudStatus('saved')
+				setCloudDetail(
+					remoteDocument
+						? `Cloud save is active for ${cloudUser.email}.`
+						: `Browser data copied to ${cloudUser.email}.`
+				)
+			} catch (error) {
+				if (didCancel) return
+				setCloudStatus('error')
+				setCloudDetail(error instanceof Error ? error.message : 'Could not load cloud save.')
+			} finally {
+				if (!didCancel) {
+					isHydratingCloudRef.current = false
+				}
+			}
+		}
+
+		void hydrateCloudDocument()
+
+		return () => {
+			didCancel = true
+			isHydratingCloudRef.current = false
+		}
+	}, [
+		cloudUser,
+		replaceProjectState,
+		replaceLibraryState,
+		applyCloudSnapshotToEditor,
+	])
+
+	useEffect(() => {
+		if (!cloudUser || isHydratingCloudRef.current) return
+		scheduleCloudSave()
+	}, [
+		cloudUser,
+		projects,
+		activeProject.id,
+		customShapeLibrary.items,
+		customShapeLibrary.activeItemId,
+		scheduleCloudSave,
+	])
+
+	const connectCloud = useCallback(() => {
+		startGoogleCloudSignIn()
+	}, [])
+
+	const disconnectCloud = useCallback(() => {
+		if (cloudSaveTimeoutRef.current !== null) {
+			window.clearTimeout(cloudSaveTimeoutRef.current)
+			cloudSaveTimeoutRef.current = null
+		}
+		void signOutCloud().finally(() => {
+			setCloudUser(null)
+			cloudDocumentRef.current = null
+			setCloudStatus('local')
+			setCloudDetail('Browser-only autosave is active. Sign in with Google to enable cloud save.')
+		})
 	}, [])
 
 	const startSharing = useCallback(() => {
@@ -276,18 +525,21 @@ function SketchBoardApp() {
 				copyShareLink={copyShareLink}
 				leaveSession={leaveSession}
 				canShare={canUseSyncServer}
+				cloudStatus={cloudStatus}
+				cloudDetail={cloudDetail}
+				isCloudEnabled={Boolean(cloudUser)}
+				connectCloud={connectCloud}
+				disconnectCloud={disconnectCloud}
 			>
-				<CustomShapeLibraryProvider>
-					{roomId ? (
-						<CollaborativeCanvas roomId={roomId} onMount={handleEditorMount} />
-					) : (
-						<LocalCanvas
-							projectId={activeProject.id}
-							persistenceKey={activeProject.persistenceKey}
-							onMount={handleEditorMount}
-						/>
-					)}
-				</CustomShapeLibraryProvider>
+				{roomId ? (
+					<CollaborativeCanvas roomId={roomId} onMount={handleEditorMount} />
+				) : (
+					<LocalCanvas
+						projectId={activeProject.id}
+						persistenceKey={activeProject.persistenceKey}
+						onMount={handleEditorMount}
+					/>
+				)}
 			</CollaborationProvider>
 		</div>
 	)
@@ -296,7 +548,9 @@ function SketchBoardApp() {
 function App() {
 	return (
 		<ProjectStateProvider>
-			<SketchBoardApp />
+			<CustomShapeLibraryProvider>
+				<SketchBoardApp />
+			</CustomShapeLibraryProvider>
 		</ProjectStateProvider>
 	)
 }
