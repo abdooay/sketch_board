@@ -148,6 +148,7 @@ export function CollaborationSharePanel() {
 	const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false)
 	const projectManagementDisabled = isCollaborating
 	const projectManagementReason = 'Leave the shared session to switch or create projects.'
+	const cloudBusy = cloudStatus === 'connecting' || cloudStatus === 'saving'
 	const cloudLabel =
 		cloudStatus === 'connecting'
 			? 'Cloud...'
@@ -158,6 +159,11 @@ export function CollaborationSharePanel() {
 					: cloudStatus === 'error'
 						? 'Cloud error'
 						: 'Sign in'
+	const cloudButtonTitle = isCloudEnabled
+		? cloudBusy
+			? cloudDetail
+			: `${cloudDetail} Click to sign out.`
+		: cloudDetail
 
 	const handleSelectProject = (projectId: string) => {
 		if (projectManagementDisabled) return
@@ -257,9 +263,11 @@ export function CollaborationSharePanel() {
 			<TldrawUiButton
 				type={isCloudEnabled ? 'normal' : 'low'}
 				className="app-share-panel__button app-share-panel__button--cloud"
-				title={cloudDetail}
+				title={cloudButtonTitle}
+				disabled={cloudBusy}
 				onClick={() => {
 					if (isCloudEnabled) {
+						if (!window.confirm('Sign out of cloud save on this browser?')) return
 						disconnectCloud()
 					} else {
 						connectCloud()

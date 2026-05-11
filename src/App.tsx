@@ -329,7 +329,7 @@ function SketchBoardApp() {
 					if (isApplyingCloudSnapshotRef.current) return
 					scheduleCloudSave()
 				},
-				{ source: 'user' }
+				{ source: 'user', scope: 'document' }
 			)
 
 			if (!roomId) return
